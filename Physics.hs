@@ -2,7 +2,7 @@ module Physics where
 
 import Math
 import Entities
-import Data.Maybe --Uso del fromMaybe
+import Data.Maybe --Uso del fromMaybe (Maybe ya inlcuido en Prelude por defecto)
 
 checkCollision :: Rectangle -> Rectangle -> Maybe Bool
 checkCollision r1 r2 = do -- Depurar posible fallo en uniqueAxes
@@ -25,7 +25,7 @@ detectRobotProjectileCollisions gs =
       isValidCollision (ROBOT_PROJECTILE robot projectile) =
         projOwner projectile /= objId (robotBase robot) &&
         fromMaybe False (isPointInsideRectangle (objPos $ projBase projectile) (robotVerts robot))
-      isValidCollision _ = False  -- Evitar warning de "non-exhaustive patterns"
+      isValidCollision _ = False  -- Evitamos warning de "non-exhaustive patterns"
 
 -- Detecta colisiones robot-robot
 detectRobotRobotCollisions :: GameState -> [CollisionEvent]

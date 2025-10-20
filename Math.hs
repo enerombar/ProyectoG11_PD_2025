@@ -2,55 +2,61 @@ module Math where
 
 import Entities
 import Data.Maybe
-import Control.Applicative (liftA2)
+import Control.Applicative (liftA2) 
 
--- Conversiones de ángulos
-deg2rad :: Double -> Double
+-- Conversión de ángulos
+deg2rad :: Float -> Float
 deg2rad deg = deg * pi / 180
 
-rad2deg :: Double -> Double
+rad2deg :: Float -> Float
 rad2deg rad = rad * 180 / pi
 
--- Dirección a partir del ángulo
+-- Dirección a partir de ángulo
 dirFromAngle :: Angle -> Vector
 dirFromAngle ang = v2 (cos ang) (sin ang)
 
--- Producto punto (adaptado para V2)
-dot :: Vector -> Vector -> Double
+-- Producto escalar
+dot :: Vector -> Vector -> Float
 dot (V2 (x1, y1)) (V2 (x2, y2)) = x1 * x2 + y1 * y2
 
--- Resta de dos vectores usando Applicative
-subVec :: Vector -> Vector -> Vector
-subVec = liftA2 (-)
--- Alternativa sin liftA2: v1 v2 = (-) <$> v1 <*> v2 Menos legible 
---Otra alternativa: v1 v2 = pure (-) <*> v1 <*> v2
+-- Operaciones de V2
+
+addV :: Vector -> Vector -> Vector
+addV = liftA2 (+) 
+
+subV :: Vector -> Vector -> Vector
+subV = liftA2 (-) 
+
+-- Escalado de un vector por un escalar
+scaleV :: Float -> Vector -> Vector
+scaleV s = fmap (*s) 
+
+-- División de un vector por un escalar 
+divV :: Vector -> Float -> Vector
+divV v s = fmap (/s) v 
 
 -- Vector perpendicular
 perp :: Vector -> Vector
 perp (V2 (vx, vy)) = v2 (-vy) vx
 
--- Escala un vector usando Functor
-scaleVec :: Vector -> Double -> Vector
-scaleVec v s = fmap (* s) v
-
 -- Norma euclídea
-norm :: Vector -> Double
+norm :: Vector -> Float
 norm (V2 (x, y)) = sqrt (x * x + y * y)
 
 -- Normaliza un vector
 normalize :: Vector -> Maybe Vector
 normalize v
   | mag == 0  = Nothing
-  | otherwise = Just $ fmap (/ mag) v
+  | otherwise = Just $ fmap (/ mag) v 
   where mag = norm v
 
 -- Comprobar si dos rangos se solapan
-overlap :: (Double, Double) -> (Double, Double) -> Bool
+overlap :: (Float, Float) -> (Float, Float) -> Bool
 overlap (minA,maxA) (minB,maxB) = not (maxA < minB || maxB < minA)
 
 -- Distancia euclídea entre dos puntos
-distance :: Point -> Point -> Double
-distance p1 p2 = norm (subVec p1 p2)
+distance :: Point -> Point -> Float
+distance p1 p2 = norm (subV p1 p2)
 
 -- Ángulo entre dos puntos
 angleToTarget :: Point -> Point -> Angle
@@ -62,10 +68,10 @@ center [] = Nothing
 center pts = Just $ fmap (/ n) s
   where
     n = fromIntegral (length pts)
-    s = foldl (liftA2 (+)) (pure 0) pts
+    s = foldl addV (pure 0) pts 
 
 -- Rota un punto alrededor de un centro
-rotatePoint :: Point -> Point -> Double -> Point
+rotatePoint :: Point -> Point -> Float -> Point
 rotatePoint (V2 (cx, cy)) (V2 (x, y)) angle =
   let dx = x - cx
       dy = y - cy
@@ -73,21 +79,22 @@ rotatePoint (V2 (cx, cy)) (V2 (x, y)) angle =
       sinA = sin angle
   in v2 (cx + dx * cosA - dy * sinA) (cy + dx * sinA + dy * cosA)
 
--- Rotar un rectángulo 
+-- Rotar un rectángulo
 rotateRectangle :: Rectangle -> Point -> Angle -> Rectangle
-rotateRectangle rect pto angle = map (\vert -> rotatePoint pto vert angle) rect --Sobre listas fmap = map y Rectangle = [Point]
+rotateRectangle rect pto angle =
+  map (\vert -> rotatePoint pto vert angle) rect
 
 -- Verifica si un punto está dentro de los límites
 isInBounds :: Point -> Point -> Point -> Bool
 isInBounds (V2 (x, y)) (V2 (minX, minY)) (V2 (maxX, maxY)) =
   x >= minX && x <= maxX && y >= minY && y <= maxY
 
--- Traslada una lista de puntos por un vector 
+-- Traslada una lista de puntos por un vector
 translatePoints :: [Point] -> Vector -> [Point]
-translatePoints pts d = map (\p -> liftA2 (+) p d) pts --Sobre listas fmap = map
+translatePoints pts d = map (`addV` d) pts 
 
 -- Proyección de un rectángulo sobre un eje
-project :: Rectangle -> Vector -> (Double, Double)
+project :: Rectangle -> Vector -> (Float, Float)
 project verts axis = (minimum scalars, maximum scalars)
   where scalars = map (`dot` axis) verts
 
@@ -110,11 +117,11 @@ createRectangleRobot t centerPt angle =
 
 -- Devuelve las aristas de un rectángulo
 edges :: Rectangle -> [Vector]
-edges verts = zipWith subVec (tail verts ++ [head verts]) verts
+edges verts = zipWith subV (tail verts ++ [head verts]) verts 
 
 -- Devuelve las normales
 uniqueAxes :: Rectangle -> Maybe [Vector]
-uniqueAxes verts = sequence (map normalize (take 2 (edges verts)))--Sequence comprueba que no haya ningún Nothing y si lo hay devuelve Nothing de todo
+uniqueAxes verts = sequence (map normalize (take 2 (edges verts)))
 
 -- Comprueba si un punto está dentro de un rectángulo
 isPointInsideRectangle :: Point -> Rectangle -> Maybe Bool
