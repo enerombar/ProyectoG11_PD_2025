@@ -2,10 +2,9 @@
 
 Este proyecto es una simulación de un torneo de batalla de robots (bots) 2D, desarrollado íntegramente en Haskell utilizando la biblioteca `gloss` para el renderizado y la gestión del bucle de juego.
 
-En esta arena, múltiples robots controlados por diferentes IA compiten entre sí. Cada robot está equipado con un chasis para moverse, una torreta para apuntar y un radar para detectar enemigos. El objetivo es ser el último robot en pie.
+En esta arena, múltiples robots controlados por diferentes IA o por un jugador humano compiten entre sí. Cada robot está equipado con un chasis para moverse, una torreta para apuntar y un radar para detectar enemigos. El objetivo es ser el último robot en pie. El juego incluye un menú de configuración para personalizar la partida.
 
 ![Imagen de muestra del juego](./assets/screenshot.png)
-
 ---
 
 ## Índice
@@ -14,6 +13,8 @@ En esta arena, múltiples robots controlados por diferentes IA compiten entre s�
 - [Dinámicas del Juego](#dinámicas-del-juego)
   - [Tipos de Robots](#tipos-de-robots)
   - [Inteligencia Artificial (IA)](#inteligencia-artificial-ia)
+  - [Control del Jugador](#control-del-jugador)
+  - [Power-ups](#power-ups)
   - [Física y Colisiones](#física-y-colisiones)
   - [Bucle Principal del Juego](#bucle-principal-del-juego)
 - [Estructura del Proyecto](#estructura-del-proyecto)
@@ -24,20 +25,25 @@ En esta arena, múltiples robots controlados por diferentes IA compiten entre s�
 
 ## Características Principales
 
-* **Renderizado 2D con Gloss:** Utiliza `gloss` para dibujar todos los elementos del juego, incluyendo el mapa de fondo, los robots (con chasis y torreta independientes), barras de vida, nombres, proyectiles y explosiones.
-* **Carga de Assets:** Carga imágenes `.png` y `.jpg` para las texturas usando `gloss-juicy`.
-* **IA Modular:** Soporta múltiples comportamientos de IA (Agresivo, Defensivo, Equilibrado, Pacífico) que pueden ser asignados a cada robot.
+* **Renderizado 2D con Gloss:** Utiliza `gloss` para dibujar todos los elementos: mapa, robots (chasis y torreta), proyectiles, explosiones, power-ups, UI (barras de vida, munición, nombres, controles).
+* **Carga de Assets:** Carga imágenes `.png` y `.jpg` usando `gloss-juicy`.
+* **Menú Interactivo:** Permite configurar la partida: añadir/eliminar robots (hasta 5), seleccionar tipo de chasis, asignar comportamiento de IA, designar un robot como jugador, activar/desactivar power-ups y cambiar la resolución.
+* **Control del Jugador:** Un robot puede ser controlado por el jugador mediante teclado (WASD) y ratón (apuntar/disparar).
+* **IA Modular:** Incluye múltiples comportamientos (Agresivo, Equilibrado, Defensivo, Pacífico, Embestidor) y utiliza memoria para recordar la última posición enemiga vista e investigarla.
 * **Sistema de Físicas:**
-    * Movimiento de robots y proyectiles.
-    * Detección y respuesta a colisiones con los límites del mundo (rebote/parada).
-* **Detección Avanzada de Colisiones:**
-    * **Robot-Proyectil:** Detección de impacto para aplicar daño (punto dentro de rectángulo).
-    * **Robot-Robot:** Detección mediante el **Teorema de Ejes Separadores (SAT)** (usando `checkCollision`). Esto previene que los robots se atraviesen y aplica daño por embestida.
+    * Movimiento de robots y proyectiles con velocidad y rotación.
+    * Colisiones con los bordes del mundo (rebote).
+* **Detección Avanzada de Colisiones (SAT):**
+    * **Robot-Proyectil:** Detección precisa para aplicar daño.
+    * **Robot-Robot:** Detección mediante el **Teorema de Ejes Separadores (SAT)** para prevenir solapamiento, aplicar daño por colisión (basado en peso y tipo RAMMER) y aplicar físicas de empuje (push-back).
+    * **Robot-PowerUp:** Detección por proximidad (radio).
+    * **Robot-Explosión:** Detección por radio para aplicar daño en área.
 * **Sistema de Combate:**
-    * Los robots tienen salud, velocidad de disparo y daño variables según su tipo.
-    * Sistema de *cooldowns* para disparos, recibir daño por colisión y parpadeo por daño.
-    * Efecto visual de "parpadeo" (`robotHitTimer`) cuando un robot recibe daño.
-    * Los robots generan una explosión visual al ser destruidos.
+    * Salud, daño, cadencia de tiro, capacidad del cargador y tiempo de recarga variables según el tipo de robot.
+    * Sistema de *cooldowns* (disparo, daño por colisión), recarga de munición y efectos visuales (parpadeo por daño).
+    * Explosiones visuales al destruir un robot o impactar un proyectil.
+* **Power-ups:** Objetos recolectables que otorgan ventajas temporales (salud, munición extra, velocidad, escudo).
+* **Fin de Partida:** Detecta cuándo queda un solo robot o ninguno y muestra una pantalla de "Game Over" con el ganador o indicando empate.
 
 ---
 
@@ -45,66 +51,109 @@ En esta arena, múltiples robots controlados por diferentes IA compiten entre s�
 
 ### Tipos de Robots
 
-Existen tres clases de robots, cada una con sus propias estadísticas (definidas en `Entities.hs`):
+Existen tres clases de robots, cada una con estadísticas distintas (definidas en `Entities.hs`):
 
-| Tipo | Salud Máx. | Velocidad | Daño Proyectil | Cooldown Disparo | Rotación Torreta |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **LIGHT** | 80.0 | 65.0 | 4.0 | 30 frames | Rápida (0.1) |
-| **MEDIUM** | 100.0 | 50.0 | 9.0 | 50 frames | Media (0.07) |
-| **HEAVY** | 120.0 | 35.0 | 16.0 | 70 frames | Lenta (0.03) |
+| Tipo    | Salud Máx. | Vel. Máx. | Daño Proy. | Cooldown Disparo | Rotación Torreta | Rotación Chasis | Peso | Cargador | Recarga |
+| :------ | :--------: | :-------: | :--------: | :--------------: | :--------------: | :-------------: | :--: | :------: | :-----: |
+| LIGHT   | 80.0       | 65.0      | 4.0        | 30 frames        | Rápida (0.1)     | Rápida (0.07)   | 1.0  | 10       | 90 fr   |
+| MEDIUM  | 100.0      | 50.0      | 9.0        | 50 frames        | Media (0.07)     | Media (0.05)    | 2.5  | 7        | 120 fr  |
+| HEAVY   | 120.0      | 35.0      | 16.0       | 70 frames        | Lenta (0.03)     | Lenta (0.02)    | 4.0  | 3        | 180 fr  |
 
 ### Inteligencia Artificial (IA)
 
-La IA (definida en `IA.hs`) controla a todos los robots basándose en su comportamiento asignado.
+La IA (definida en `IA.hs`) controla a los robots no jugadores.
 
-1.  **Detección:** Cada robot usa su `radarLength` para escanear en busca del enemigo más cercano (`findClosestEnemy`).
-2.  **Navegación:**
-    * **Wander (Deambular):** Si no hay enemigos, el robot deambula (`wanderActions`). Utiliza su memoria (`robotMem`) y un temporizador (`robotWanderTimer`) para decidir cuándo girar.
-    * **Evitar Paredes:** Si se acerca demasiado a un borde (`isNearWall`), gira 90 grados para evitarlo.
-    * **Evitar Bloqueos:** Usa un "sensor" frontal (`isPathBlocked`) para detectar si otro robot le bloquea el paso y, en ese caso, frena y gira.
-3.  **Comportamientos de Combate:**
-    * **`AGGRESSIVE`**: Persigue activamente al enemigo, alineando su chasis con él, mientras le dispara.
-    * **`BALANCED`**: Se detiene para apuntar y disparar con precisión al enemigo detectado. No lo persigue.
-    * **`DEFENSIVE`**: Apunta y dispara, pero si el enemigo se acerca demasiado (menos del 50% de su rango de radar), retrocede mientras dispara.
-    * **`PEACEFUL`**: Ignora a los enemigos y solo se dedica a deambular.
+1.  **Prioridades:** La IA primero evalúa si ir a por un power-up (`shouldGoForPowerUp`) comparando su distancia con la del enemigo más cercano al objeto.
+2.  **Detección:** Usa `radarLength` para buscar al enemigo vivo más cercano (`findClosestEnemy`).
+3.  **Memoria e Investigación:** Si un enemigo detectado se pierde de vista, la IA guarda su última posición conocida (`last_seen_pos` en `robotMem`) y se dirige hacia ella (`investigateOrWander`). Si llega cerca sin encontrarlo, olvida la posición y vuelve a deambular.
+4.  **Navegación:**
+    * **Wander (Deambular):** Si no hay enemigo visible ni posición que investigar, deambula (`wanderActions`), usando memoria y un temporizador para giros periódicos.
+    * **Evitar Paredes:** Gira 90º si se acerca a un borde (`isNearWall`).
+    * **Movimiento Seguro:** Por defecto avanza (`getSafeMoveAction`), pero la lógica de colisión Robot-Robot en `Logic.hs` puede detenerlo si está bloqueado (excepto si es RAMMER).
+5.  **Comportamientos de Combate:**
+    * **`AGGRESSIVE`**: Persigue activamente (`actionsToMoveTowards`), apunta y dispara (`actionsToAimAndFire`). Guarda la posición del enemigo si lo ve.
+    * **`BALANCED`**: Se detiene, apunta y dispara. No persigue, pero sí investiga si pierde al enemigo.
+    * **`DEFENSIVE`**: Apunta y dispara. Si el enemigo está muy cerca (50% del radar), retrocede mientras dispara. Investiga si pierde al enemigo.
+    * **`PEACEFUL`**: Deambula o va a por power-ups. Ignora y nunca ataca a los enemigos. Borra la memoria de posiciones.
+    * **`RAMMER`**: **Nunca dispara**. Prioriza perseguir enemigos de peso igual o inferior. Si no hay, persigue al más cercano. Guarda su posición para investigar. Ignora el bloqueo de otros robots al moverse.
+
+### Control del Jugador
+
+Si se designa un robot como `PLAYER` en el menú de configuración:
+
+* **W, S:** Mover chasis adelante/atrás.
+* **A, D:** Rotar chasis izquierda/derecha.
+* **Movimiento del Ratón:** Apuntar la torreta hacia el cursor.
+* **Clic Izquierdo:** Disparar (sujeto a cooldown, munición y recarga).
+
+Una UI simple en la esquina inferior derecha recuerda estos controles.
+
+### Power-ups
+
+Si están habilitados en el menú, aparecen periódicamente en el mapa (`Game.hs`, `Logic.hs`).
+
+* **Aparición:** Cada `powerUpSpawnInterval` (10s), un power-up de tipo aleatorio aparece en una posición aleatoria.
+* **Duración:** Permanece `powerUpDuration` (15s) en el mapa antes de desaparecer y reiniciar el temporizador de aparición.
+* **Recogida:** Un robot lo recoge al pasar cerca (suma de radios).
+* **Tipos (`Entities.hs`):**
+    * **`Health`**: Restaura `healthPackAmount` (35) de vida (hasta el máximo).
+    * **`AmmoBoost`**: Añade `ammoBoostAmount` (5) balas al cargador (hasta 2x tamaño máx.).
+    * **`SpeedBoost`**: Aumenta la velocidad máxima por `speedBoostFactor` (x2.0) durante `speedBoostDuration` (7s).
+    * **`Shield`**: Otorga invulnerabilidad al daño durante `shieldDuration` (10s).
 
 ### Física y Colisiones
 
-* **Movimiento:** La física es simple. Las acciones de la IA (ej. `MOVE_FORWARD_ACTION`) establecen una velocidad (`objVel`) en el robot. En cada frame, la posición se actualiza `(posición + velocidad * dt)`.
-* **Colisiones con Muros:** Se comprueba la "siguiente" posición (`newX_pot`, `newY_pot`). Si está fuera de los límites, la posición se fija en el borde y la velocidad se invierte o corrige.
+Gestionadas principalmente en `Physics.hs` (detección) y `Logic.hs` (resolución).
+
+* **Movimiento:** Actualización simple de posición: `posición + velocidad * dt`. La velocidad se aplica según las acciones (`applyAction`). Se aplica fricción (`speedDec`) si la acción es `STOP_ACTION`.
+* **Colisiones con Muros:** Se detectan usando SAT contra rectángulos virtuales en los bordes (`updatePosition`). El robot rebota con velocidad reducida.
 * **Colisiones Robot-Robot:**
-    1.  **Bloqueo:** En `Logic.updatePosition`, antes de moverse, un robot comprueba si su *futura* posición (`potentialVerts`) colisiona con otro robot (`isColliding`). Si es así, su movimiento se cancela y su velocidad se reduce.
-    2.  **Daño:** En `Logic.resolveCollision`, se comprueba si dos robots están actualmente solapados. Si es así, y si no están en *cooldown* de colisión, ambos reciben daño proporcional al peso del *otro* robot. Tienen un breve *cooldown* de inmunidad (`robotCollisionTimer`).
+    1.  **Detección:** Usando SAT (`checkCollision` en `Physics.hs`).
+    2.  **Resolución (`resolveCollision` en `Logic.hs`):**
+        * **Daño:** Ambos robots reciben daño si no están en cooldown (`robotCollisionTimer`). El daño base (`baseRobotCollisionDamage`) se escala por la proporción de peso del *otro* robot. Los `RAMMER` multiplican el daño que *infligen*.
+        * **Empuje (Push-back):** Los robots se separan físicamente una distancia proporcional al solapamiento detectado y al peso del oponente. La posición final se asegura (`clampRobotPosition`) para no salirse del mapa.
+        * **Inmunidad:** Se activa un breve cooldown (`robotCollisionCooldown`) para evitar daño múltiple instantáneo.
+    3.  **Bloqueo (Prevención):** Antes de moverse, los robots (excepto `RAMMER`) comprueban si su *futura* posición colisionaría (`updatePosition`). Si es así, no se mueven y frenan.
+* **Colisiones Robot-Proyectil:**
+    * Detección SAT (`Physics.hs`).
+    * Resolución (`resolveCollision`): Se aplica `projDamage`. Si el robot tiene escudo (`robotShieldTimer > 0`), el daño se anula. El proyectil se elimina. Se activa el parpadeo (`robotHitTimer`).
+* **Colisiones Robot-Explosión:**
+    * Detección por radio (`Physics.hs`).
+    * Resolución (`resolveCollision`): Se aplica `explosionDamageConstant`. Ignorado si el escudo está activo.
+* **Colisiones Robot-PowerUp:**
+    * Detección por radio (`Physics.hs`).
+    * Resolución (`resolveCollision`): Se aplica el efecto del power-up (`applyPowerUpIfMatch`) y el power-up se elimina del mapa.
 
 ### Bucle Principal del Juego
 
-El corazón del juego reside en la función `updateHandler` (en `Main.hs`):
+Controlado por `updateHandler` -> `updateGame` en `Main.hs`:
 
-1.  **`decreaseCooldown`**: Reduce todos los contadores (disparo, parpadeo, "wander", inmunidad por colisión).
-2.  **`exampleBotActions`**: Llama a la IA (`getAIActions`) para obtener la lista de acciones de todos los robots vivos.
-3.  **`applyActions`**: Traduce las acciones (ej. `MOVE_FORWARD_ACTION`, `FIRE_ACTION`) en cambios en el estado del robot (ej. actualizar velocidad, disparar si el *cooldown* es 0).
-4.  **`updatePhysics`**: Mueve cada robot (`updatePosition`) y cada proyectil (`updateProjectilePosition`), gestionando las colisiones con muros y el bloqueo entre robots.
-5.  **`checkCollisions`**: Detecta *todas* las colisiones (Robot-Proyectil, Robot-Robot, Robot-Explosión) y devuelve una lista de `CollisionEvent`.
-6.  **`resolveCollisions`**: Procesa la lista de colisiones, aplicando daño, eliminando proyectiles y activando temporizadores de parpadeo.
-7.  **Gestión de Muerte:** Separa a los robots en `livingRobots` y `deadRobots` basándose en `isRobotAlive`.
-8.  **`createExplosionFromRobot`**: Crea un objeto `Explosion` por cada robot que acaba de morir.
-9.  **Estado Final:** Construye el `GameState` para el siguiente frame, pasando solo los robots vivos y añadiendo las nuevas explosiones.
+1.  **`decreaseCooldown`**: Reduce todos los contadores (disparo, parpadeo, IA wander, colisión, recarga, power-ups activos, power-up en mapa). Finaliza recargas y elimina explosiones/proyectiles expirados.
+2.  **`updatePowerUpSpawning`**: Comprueba si debe aparecer un nuevo power-up.
+3.  **`applyPlayerActionsFromState`**: Aplica las acciones derivadas de la entrada del jugador almacenada en `GameState`.
+4.  **`getAIActions`**: Obtiene la lista de acciones decididas por la IA para todos los bots.
+5.  **`applyActions`**: Ejecuta todas las acciones (jugador y IA), modificando velocidades, ángulos, memoria de IA, iniciando disparos, etc.
+6.  **`updatePhysics`**: Mueve robots y proyectiles. Gestiona colisiones con muros (rebote) y expiración de proyectiles (crea explosiones). Previene movimiento si un robot (no RAMMER) chocaría con otro.
+7.  **`checkCollisions`**: Detecta *todas* las colisiones ocurridas *después* del movimiento (Robot-Proy, Robot-Robot, Robot-Explosión, Robot-PowerUp).
+8.  **`resolveCollisions`**: Procesa las colisiones: aplica daño (considerando escudos), aplica empuje físico (robot-robot), elimina proyectiles/power-ups, activa temporizadores (parpadeo, inmunidad por colisión).
+9.  **Gestión de Muerte:** Filtra robots vivos y muertos.
+10. **`createExplosionFromRobot`**: Crea explosiones visuales y de daño donde murieron los robots.
+11. **Comprobación Fin de Partida:** Si quedan 1 o 0 robots, cambia el `AppState` a `GameOver`.
+12. **Estado Final:** Construye el `GameState` para el siguiente frame.
 
 ---
 
 ## Estructura del Proyecto
 
-El código está organizado en módulos de Haskell:
-
-* `Main.hs`: Punto de entrada. Define la ventana, carga los *assets* y contiene el bucle `play` de `gloss`, uniendo el renderizado (`drawHandler`) y la lógica (`updateHandler`).
-* `Entities.hs`: Define todas las estructuras de datos (`GameState`, `Robot`, `Projectile`, `Action`) y las estadísticas base de los robots.
-* `Game.hs`: Define el estado inicial del juego (`exampleGameState`), los constructores (ej. `createRobot`) y las constantes globales (ej. `gameSize`).
-* `Math.hs`: Biblioteca de utilidades para matemáticas, vectores (`V2`), ángulos, rotaciones y geometría (proyecciones para SAT).
-* `Physics.hs`: Lógica pura de *detección* de colisiones (SAT, punto-en-rectángulo, distancia).
-* `Logic.hs`: Lógica de *aplicación* y *resolución*. Contiene las reglas del juego: cómo se aplica una acción, cómo se mueven los objetos, qué pasa *después* de una colisión (daño, etc.), y la gestión de *cooldowns* y explosiones.
-* `IA.hs`: El "cerebro" de los robots. Define los diferentes comportamientos, la detección de enemigos y la lógica de navegación (deambular, evitar muros).
-* `configuration.cabal`: Archivo de configuración de Cabal para construir el proyecto.
-* `assets/`: Carpeta que **debe contener** las imágenes (`mapa.jpg`, `chasis.png`, `torreta.png`).
+* `Main.hs`: Punto de entrada, bucle principal de Gloss, carga de assets, renderizado, manejo de eventos, gestión del estado de la aplicación (Menú/Juego/Game Over).
+* `Entities.hs`: Definiciones de tipos de datos (`GameState`, `Robot`, `Projectile`, `PowerUp`, `Action`, etc.) y constantes de estadísticas base.
+* `Game.hs`: Lógica de inicialización del juego (`startGameFromConfigs`), constructores seguros (`createRobot`), generación aleatoria de posiciones y power-ups.
+* `Math.hs`: Utilidades matemáticas (vectores `V2`, ángulos, rotaciones) y geometría para colisiones (SAT helpers).
+* `Physics.hs`: Detección de colisiones (SAT, radio).
+* `Logic.hs`: Reglas del juego: aplicación de acciones, actualización de físicas (movimiento, colisión con muros, bloqueo), resolución de colisiones (daño, efectos, empuje), gestión de cooldowns, lógica del jugador y power-ups.
+* `IA.hs`: Comportamientos de la IA, detección de enemigos, navegación (wander, evitar muros), toma de decisiones (atacar, investigar, ir por power-ups).
+* `juego.cabal`: Archivo de configuración de Cabal para dependencias y construcción.
+* `assets/`: Carpeta que **debe contener** las imágenes (`mapa.jpg`, `screenshot.png`) y subcarpetas (`drones/`, `torretas/`, `items/`, `explosion/`) con los respectivos archivos `.png`.
 
 ---
 
@@ -112,53 +161,50 @@ El código está organizado en módulos de Haskell:
 
 ### Prerrequisitos
 
-1.  Tener instalado el compilador de Haskell (GHC) y la herramienta de gestión de paquetes (Cabal). La forma más fácil es instalar la [Plataforma Haskell](https://www.haskell.org/ghcup/).
-2.  Asegurarte de tener los *assets* (imágenes) en la carpeta correcta.
+1.  Tener instalado el compilador de Haskell (GHC) y la herramienta de gestión de paquetes (Cabal). La forma recomendada es usar [GHCup](https://www.haskell.org/ghcup/).
+2.  Asegurarte de tener la carpeta `assets` con todas las imágenes necesarias en la raíz del proyecto.
 
 ### Pasos para la Ejecución
 
-1.  **Clona el repositorio:**
+1.  **Clona el repositorio (o descomprime el proyecto):**
     ```bash
-    git clone [https://github.com/tu-usuario/tu-repositorio.git](https://github.com/tu-usuario/tu-repositorio.git)
-    cd tu-repositorio
+    git clone [URL_DEL_REPOSITORIO]
+    cd [NOMBRE_CARPETA_PROYECTO]
     ```
 
-2.  **Crea la carpeta `assets`:**
-    Asegúrate de que en la raíz del proyecto exista una carpeta llamada `assets` que contenga:
-    * `mapa.jpg`
-    * `chasis.png`
-    * `torreta.png`
+2.  **Verifica la carpeta `assets`:**
+    Confirma que la carpeta `assets` existe en la raíz y contiene `mapa.jpg`, `screenshot.png` (opcional, para el README), y las subcarpetas `drones`, `torretas`, `items`, `explosion` con sus respectivas imágenes `.png`.
 
 3.  **Construye y ejecuta con Cabal:**
-    Cabal leerá el archivo `configuration.cabal`, descargará las dependencias (como `gloss` y `gloss-juicy`) y compilará el proyecto.
+    Cabal gestionará las dependencias listadas en `juego.cabal` (`gloss`, `gloss-juicy`, `containers`, `random`) y compilará el proyecto.
 
     ```bash
-    # Actualiza la lista de paquetes (recomendado)
+    # (Opcional) Actualiza la lista de paquetes disponibles
     cabal update
 
-    # Instala dependencias y construye el proyecto
+    # Construye el proyecto (descarga dependencias si es necesario)
     cabal build
 
-    # Ejecuta el juego
-    # (El nombre "JuegoTanque" se toma de 'executable' en el .cabal)
-    cabal run JuegoTanque
+    # Ejecuta el juego (el nombre 'juego' se toma del .cabal)
+    cabal run juego
     ```
 
-4.  **Alternativa (GHC directo):**
-    Si tienes las bibliotecas `gloss`, `gloss-juicy`, `containers` y `JuicyPixels` instaladas globalmente, puedes compilarlo directamente (menos recomendado para gestión de dependencias):
-    ```bash
-    ghc --make Main.hs -o JuegoTanque
-    ./JuegoTanque
-    ```
+4.  **Uso:**
+    * Navega por el menú con el ratón.
+    * En la pantalla de configuración, añade robots, cambia sus tipos y comportamientos de IA. Marca la casilla "Jugador" para controlar uno.
+    * Presiona "Jugar" (necesitas al menos 2 robots).
+    * Controla tu robot con WASD y el ratón si lo seleccionaste.
+    * Presiona 'F' en cualquier momento para volver al menú principal.
+    * Presiona 'R' durante el juego (modo InGame) para añadir un robot RAMMER aleatorio (para pruebas).
 
 ---
 
 ## Posibles Mejoras Futuras
 
-* **Control por Teclado:** Implementar el `eventHandler` (actualmente vacío) para permitir que el jugador controle uno de los robots usando el teclado.
-* **Combate por Equipos:** Añadir una propiedad `team` a los robots y modificar la IA (`findClosestEnemy`) para que no ataque a compañeros de equipo y, potencialmente, coordine ataques.
-* **Daño por Explosión:** Actualmente las colisiones `ROBOT_EXPLOSION` se detectan pero no se resuelven (la función `resolveCollision` no aplica daño para este caso). Se podría implementar que apliquen daño en área.
-* **Fin de Partida:** Detectar cuándo solo queda un robot (o un equipo) y mostrar un mensaje de "Ganador".
-* **Puntuación:** Añadir un contador de "kills" o un sistema de puntuación.
-* **Power-ups:** Añadir objetos recogibles en el mapa (curaciones, escudos, mejoras de daño).
-* **Mejoras de IA:** Implementar IA que trabaje en equipo, que huya si tiene poca vida, o que priorice objetivos débiles.
+* **Combate por Equipos:** Añadir propiedad `team` y modificar IA para cooperación/evitar fuego amigo.
+* **Mejor UI:** Indicadores más claros para recarga, cooldowns, efectos de power-ups. Minimapa.
+* **Sonido:** Añadir efectos de sonido para disparos, explosiones, colisiones, recogida de power-ups y música de fondo.
+* **Más Power-ups/Tipos de Robots:** Introducir nuevas mecánicas o variantes de robots.
+* **IA Avanzada:** Implementar estrategias más complejas: huida con poca vida, priorización de objetivos, formaciones, uso estratégico de power-ups.
+* **Obstáculos en el Mapa:** Añadir paredes u otros elementos en la arena para hacer la navegación más interesante.
+* **Guardar/Cargar Configuración:** Permitir guardar las configuraciones de partida del menú.
