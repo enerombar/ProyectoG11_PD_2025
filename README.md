@@ -4,23 +4,23 @@ Este proyecto es una simulación de un torneo de batalla de robots (bots) 2D, de
 
 En esta arena, múltiples robots controlados por diferentes IA o por un jugador humano compiten entre sí. Cada robot está equipado con un chasis para moverse, una torreta para apuntar y un radar para detectar enemigos. El objetivo es ser el último robot en pie. El juego incluye un menú de configuración para personalizar la partida.
 
-!(./assets/screenshot.png)
+![Imagen de muestra del juego](./assets/screenshot.png)
 ---
 
 ## Índice
 
-- (#características-principales)
-- (#dinámicas-del-juego)
-  - (#tipos-de-robots)
-  - (#inteligencia-artificial-ia)
-  - (#control-del-jugador)
-  - (#power-ups)
-  - (#obstáculos)
-  - (#física-y-colisiones)
-  - (#bucle-principal-del-juego)
-- (#estructura-del-proyecto)
-- (#cómo-ejecutar-el-juego)
-- (#posibles-mejoras-futuras)
+- [Características Principales](#características-principales)
+- [Dinámicas del Juego](#dinámicas-del-juego)
+  - [Tipos de Robots](#tipos-de-robots)
+  - [Inteligencia Artificial (IA)](#inteligencia-artificial-ia)
+  - [Control del Jugador](#control-del-jugador)
+  - [Power-ups](#power-ups)
+  - [Obstáculos](#obstáculos)
+  - [Física y Colisiones](#física-y-colisiones)
+  - [Bucle Principal del Juego](#bucle-principal-del-juego)
+- [Estructura del Proyecto](#estructura-del-proyecto)
+- [Cómo Ejecutar el Juego](#cómo-ejecutar-el-juego)
+- [Posibles Mejoras Futuras](#posibles-mejoras-futuras)
 
 ---
 
@@ -227,15 +227,15 @@ Controlado por `updateHandler` -> `updateGame` en `Main.hs`:
 
 ### Prerrequisitos
 
-1.  Tener instalado el compilador de Haskell (GHC) y la herramienta de gestión de paquetes (Cabal). La forma recomendada es usar (https://www.haskell.org/ghcup/).
+1.  Tener instalado el compilador de Haskell (GHC) y la herramienta de gestión de paquetes (Cabal). La forma recomendada es usar [GHCup](https://www.haskell.org/ghcup/).
 2.  Asegurarte de tener la carpeta `assets` con todas las imágenes necesarias en la raíz del proyecto.
 
 ### Pasos para la Ejecución
 
 1.  **Clona el repositorio (o descomprime el proyecto):**
     ```bash
-    git clone 
-    cd 
+    git clone [URL_DEL_REPOSITORIO]
+    cd [NOMBRE_CARPETA_PROYECTO]
     ```
 
 2.  **Verifica la carpeta `assets`:**
