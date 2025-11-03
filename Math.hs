@@ -163,3 +163,58 @@ isPointInsideRectangle pto rect = do
 -- Esencial para evitar vueltas completas y encontrar el camino más corto.
 normalizeAngle :: Angle -> Angle
 normalizeAngle ang = atan2 (sin ang) (cos ang)
+
+-- ########## Lógica de Intersección de Línea de Visión ##########
+
+-- Comprueba si el punto q está en el segmento 'pr' (para puntos colineales)
+onSegment :: Point -> Point -> Point -> Bool
+onSegment (V2 (px, py)) (V2 (qx, qy)) (V2 (rx, ry)) =
+    (qx <= max px rx) && (qx >= min px rx) &&
+    (qy <= max py ry) && (qy >= min py ry)
+
+-- 0 -> Colineal
+-- 1 -> Sentido horario (Clockwise)
+-- 2 -> Sentido anti-horario (Counterclockwise)
+orientation :: Point -> Point -> Point -> Int
+orientation (V2 (px, py)) (V2 (qx, qy)) (V2 (rx, ry)) =
+    let val = (qy - py) * (rx - qx) - (qx - px) * (ry - qy)
+    in if abs val < 1e-6 -- Tolerancia para floats
+       then 0 -- Colineal
+       else if val > 0 then 1 else 2 -- Horario o Anti-horario
+
+-- Comprueba si dos segmentos de línea (p1, q1) y (p2, q2) se intersectan.
+doIntersect :: Point -> Point -> Point -> Point -> Bool
+doIntersect p1 q1 p2 q2 =
+    let o1 = orientation p1 q1 p2
+        o2 = orientation p1 q1 q2
+        o3 = orientation p2 q2 p1
+        o4 = orientation p2 q2 q1
+    in
+        -- Caso General
+        (o1 /= o2 && o3 /= o4) ||
+        -- Casos Especiales (Colineales)
+        (o1 == 0 && onSegment p1 p2 q1) ||
+        (o2 == 0 && onSegment p1 q2 q1) ||
+        (o3 == 0 && onSegment p2 p1 q2) ||
+        (o4 == 0 && onSegment p2 q1 q2)
+
+-- Comprueba si un segmento (p1, p2) se cruza con un rectángulo.
+-- Devuelve 'Maybe Bool' para ser consistente con checkCollision.
+checkSegmentRectIntersection :: Point -> Point -> Rectangle -> Maybe Bool
+checkSegmentRectIntersection p1 p2 rect =
+    let
+        -- Obtener las 4 aristas del rectángulo
+        rectEdges = zip rect (tail rect ++ [head rect])
+        
+        -- Comprobar si el segmento cruza alguna de las aristas
+        crossesEdge = any (\(v1, v2) -> doIntersect p1 p2 v1 v2) rectEdges
+        
+        -- Comprobar si el segmento está *completamente dentro* del rectángulo
+        -- (lo cual no contaría como cruce de arista).
+        p1_inside = fromMaybe False (isPointInsideRectangle p1 rect)
+        p2_inside = fromMaybe False (isPointInsideRectangle p2 rect)
+        
+    in
+        -- Hay intersección si cruza una arista O si uno de sus puntos está dentro.
+        -- (Para LOS, si el objetivo está dentro de un muro, tampoco hay visión)
+        Just (crossesEdge || p1_inside || p2_inside)

@@ -8,7 +8,7 @@ import Graphics.Gloss.Juicy (loadJuicy)
 import System.Random (randomRIO)
 import System.IO.Unsafe (unsafePerformIO)
 import System.Exit (exitSuccess)
-import Data.Maybe (fromMaybe, isJust)
+import Data.Maybe (fromMaybe, isJust, mapMaybe)
 import Data.List (findIndex)
 import Data.Char (toLower)
 import Data.Set (Set)
@@ -17,7 +17,7 @@ import qualified Data.Map as Map
 
 -- Imports Locales
 import Entities
-import Math (rad2deg, angleToTarget)
+import Math (rad2deg, angleToTarget, distance)
 import Game
 import Logic -- Importa applyActions, updatePhysics, resolveCollisions, etc.
 import Physics (checkCollisions)
@@ -28,7 +28,7 @@ import IA (getAIActions)
 -------------------------------------------------------------------------------
 
 availableResolutions :: [(Float, Float)]
-availableResolutions = [(800, 600), (1024, 768), (1280, 720)]
+availableResolutions = [(1280, 720), (900, 600)]
 
 defaultResolution :: (Float, Float)
 defaultResolution = head availableResolutions
@@ -83,6 +83,7 @@ data MenuState = MenuState
   , msWidth  :: Float
   , msHeight :: Float
   , msPowerUpsEnabled :: Bool
+  , msShowHitboxes :: Bool
   } deriving (Show, Eq)
 
 data AppState
@@ -104,6 +105,15 @@ data GameAssets = GameAssets
   , aBulletImage         :: Picture
   , aExplosionFrames     :: [Picture]
   , aPowerUpPics         :: Map.Map PowerUpType Picture
+  , aObstacleWallPic     :: Picture
+  , aObstacleDamageRectPic :: Picture
+  , aObstacleDamagePic   :: Picture 
+  , aMinaInactivaPic :: Picture
+  , aMinaActivaPic :: Picture
+  , aObstacleTeslaPic :: Picture
+  , aObstacleStormPic :: Picture
+  , aBlueChasisOverlay :: Picture
+  , aTurretBlueOverlay :: Picture
   }
 
 -- Estado inicial del menú
@@ -116,6 +126,7 @@ initialMenuState = MenuState
   , msWidth  = fst defaultResolution
   , msHeight = snd defaultResolution
   , msPowerUpsEnabled = True
+  , msShowHitboxes = False
   }
 
 -------------------------------------------------------------------------------
@@ -136,14 +147,24 @@ main = do
   maybePlayerTurretImage   <- loadJuicy "assets/torretas/torreta.png"
   maybeAITurretImage       <- loadJuicy "assets/torretas/torreta_robot.png"
   maybeTurretHitImage      <- loadJuicy "assets/torretas/torreta_blanca.png"
+  maybeTurretBlueImage     <- loadJuicy "assets/torretas/torreta_azul.png"
   maybeBulletImage         <- loadJuicy "assets/items/bullet.png"
   maybeExplosionFrames     <- mapM loadJuicy explosionFrameNames
   maybeHealthPU            <- loadJuicy "assets/items/health_powerup.png"
   maybeAmmoPU              <- loadJuicy "assets/items/bullet_powerup.png"
   maybeSpeedPU             <- loadJuicy "assets/items/speed_powerup.png"
   maybeShieldPU            <- loadJuicy "assets/items/shield_powerup.png"
+  maybeObstacleWall        <- loadJuicy "assets/obstaculos/wall.png"
+  maybeObstacleDamageRect  <- loadJuicy "assets/obstaculos/damage_zone_rect.png"
+  maybeObstacleDamage      <- loadJuicy "assets/obstaculos/damage_zone.png"
+  maybeMinaInactiva        <- loadJuicy "assets/obstaculos/mina_inactiva.png"
+  maybeMinaActiva          <- loadJuicy "assets/obstaculos/mina_activa.png"
+  maybeObstacleTesla       <- loadJuicy "assets/obstaculos/torre_tesla.png"
+  maybeObstacleStorm       <- loadJuicy "assets/obstaculos/tormenta.png"
+  maybeBlueChasis          <- loadJuicy "assets/drones/dron_azul.png"
 
-  -- Imágenes de fallback (si falla la carga)
+
+  -- Imágenes de fallback
   let bgImage = fromMaybe (Color white $ rectangleSolid defW defH) maybeBgImage
   let playerChasisImage = fromMaybe (Color blue $ rectangleSolid playerChasisImgWidth playerChasisImgHeight) maybePlayerChasisImage
   let aiChasisImage = fromMaybe (Color red $ rectangleSolid aiChasisImgWidth aiChasisImgHeight) maybeAIChasisImage
@@ -152,12 +173,21 @@ main = do
   let playerTurretImage = fromMaybe (Color green $ rectangleSolid turretImgWidth turretImgHeight) maybePlayerTurretImage
   let aiTurretImage = fromMaybe (Color yellow $ rectangleSolid turretImgWidth turretImgHeight) maybeAITurretImage
   let turretHitImage = fromMaybe (Color white $ rectangleSolid turretImgWidth turretImgHeight) maybeTurretHitImage
+  let turretBlueOverlay = fromMaybe (Color (withAlpha 0.5 blue) $ rectangleSolid turretImgWidth turretImgHeight) maybeTurretBlueImage
   let bulletImage = fromMaybe (Color yellow $ rectangleSolid bulletImgWidth bulletImgHeight) maybeBulletImage
   let explosionFrames = map (fromMaybe Blank) maybeExplosionFrames
   let healthPUPic = fromMaybe (Color green $ circleSolid 20) maybeHealthPU
   let ammoPUPic   = fromMaybe (Color yellow $ rectangleSolid 30 30) maybeAmmoPU
   let speedPUPic  = fromMaybe (Color cyan $ ThickCircle 15 5) maybeSpeedPU
   let shieldPUPic = fromMaybe (Color blue $ ThickCircle 15 5) maybeShieldPU
+  let obstacleWallPic   = fromMaybe (Color (greyN 0.5) $ rectangleSolid 100 100) maybeObstacleWall
+  let obstacleDamagePic = fromMaybe (Color (dark magenta) $ circleSolid 50) maybeObstacleDamage
+  let obstacleDamageRectPic = fromMaybe (Color (dark red) $ rectangleWire 100 100) maybeObstacleDamageRect
+  let minaInactivaPic = fromMaybe (Color (greyN 0.5) $ circleSolid 30) maybeMinaInactiva
+  let minaActivaPic = fromMaybe (Color (dark red) $ circleSolid 30) maybeMinaActiva
+  let obstacleTeslaPic = fromMaybe (Color (dim cyan) $ circleSolid 30) maybeObstacleTesla
+  let obstacleStormPic = fromMaybe (Color (withAlpha 0.35 blue) $ circleSolid 30) maybeObstacleStorm
+  let blueChasisOverlay = fromMaybe (Color (withAlpha 0.5 blue) $ rectangleSolid playerChasisImgWidth playerChasisImgHeight) maybeBlueChasis
 
   let powerUpPics = Map.fromList
         [ (Health, healthPUPic)
@@ -176,9 +206,18 @@ main = do
         , aPlayerTurretImage    = playerTurretImage
         , aAITurretImage        = aiTurretImage
         , aTurretHitImage       = turretHitImage
+        , aTurretBlueOverlay    = turretBlueOverlay
         , aBulletImage          = bulletImage
         , aExplosionFrames      = explosionFrames
         , aPowerUpPics          = powerUpPics
+        , aObstacleWallPic      = obstacleWallPic
+        , aObstacleDamagePic    = obstacleDamagePic
+        , aObstacleDamageRectPic = obstacleDamageRectPic
+        , aMinaInactivaPic = minaInactivaPic
+        , aMinaActivaPic = minaActivaPic
+        , aObstacleTeslaPic = obstacleTeslaPic
+        , aObstacleStormPic = obstacleStormPic
+        , aBlueChasisOverlay = blueChasisOverlay
         }
 
   let initialState = InMenu initialMenuState
@@ -204,8 +243,12 @@ updateGame dt gs =
     -- 1. Reducir todos los cooldowns y temporizadores
     gsCooldowns = decreaseCooldown gs
 
+    -- 1.5. Comprobar si alguna mina ha explotado
+    gsMinesResolved = resolveExplodingMines gsCooldowns
+
     -- 2. Comprobar y potencialmente spawnear/reubicar un powerup
-    gsPowerUpSpawned = updatePowerUpSpawning gsCooldowns
+    --    (Usamos gsMinesResolved como base ahora)
+    gsPowerUpSpawned = updatePowerUpSpawning gsMinesResolved
 
     -- 3. Aplicar acciones del jugador (movimiento, disparo)
     gsAfterPlayer = applyPlayerActionsFromState gsPowerUpSpawned
@@ -216,13 +259,16 @@ updateGame dt gs =
     -- 5. Aplicar acciones de la IA
     gsAfterActions = applyActions aiActions gsAfterPlayer
 
+    -- 5.5. Torres Tesla (ataques + ralentizacion)
+    gsAfterTesla = updateTeslaTowers gsAfterActions
+
     -- 6. Actualizar físicas (mover objetos)
-    gsAfterPhysics = updatePhysics dt gsAfterActions
+    gsAfterPhysics = updatePhysics dt gsAfterTesla
 
     -- 7. Comprobar TODAS las colisiones
     allCollisions = checkCollisions gsAfterPhysics
 
-    -- 8. Resolver colisiones (daño, efectos, eliminar entidades)
+    -- 8. Resolver colisiones (daño, efectos, eliminar entidades, activar minas)
     gsAfterCollisions = resolveCollisions allCollisions gsAfterPhysics
 
     -- 9. Manejar muertes de robots y crear explosiones
@@ -246,47 +292,35 @@ updateGame dt gs =
 drawGame :: GameAssets -> GameState -> Picture
 drawGame assets gs =
   let (V2 (worldW, worldH)) = gameDimensions gs
-
-      -- !! AÑADIDO: Define el borde del mapa !!
-      -- Se usa Line para crear un rectángulo cerrado con las dimensiones del mundo.
-      mapBorder = Color white $ Line [ (0, 0)          -- Esquina superior izquierda
-                                     , (worldW, 0)       -- Esquina superior derecha
-                                     , (worldW, worldH)  -- Esquina inferior derecha
-                                     , (0, worldH)       -- Esquina inferior izquierda
-                                     , (0, 0)          -- Volver al inicio para cerrar
-                                     ]
-
-      -- Dibuja el powerup activo si existe
+      mapBorder = Color white $ Line [ (0, 0), (worldW, 0), (worldW, worldH), (0, worldH), (0, 0) ]
       powerUpPic = case powerUp gs of
           Nothing -> Blank
           Just pu -> drawPowerUp (aPowerUpPics assets) pu
-
-      -- Dibuja los controles del Jugador
       controlsPic = drawPlayerControls gs
 
-      -- Dibuja las entidades del juego
-      robotPics     = map (drawRobot assets) (robots gs)
+      -- Dibujo de entidades
+      robotPics     = map (drawRobot assets gs) (robots gs)
       projPics      = map drawProjectile (projectiles gs)
       explosionPics = map (drawExplosion (aExplosionFrames assets)) (explosions gs)
+      obstaclePics  = map (drawObstacle assets gs) (obstacles gs)
 
-  -- El (0,0) de nuestro juego está en la esquina superior izquierda.
-  -- El (0,0) de Gloss está en el centro.
-  -- Esta traslación ajusta el sistema de coordenadas.
   in Translate (-worldW / 2) (-worldH / 2) $
-      Pictures $
-        [ -- Fondo escalado
-          Translate (worldW / 2) (worldH / 2) $
-          Scale (worldW / bgWidth) (worldH / bgHeight) (aBgImage assets)
-        , mapBorder 
-        ]
-        -- Entidades del juego (se dibujan sobre el fondo y el borde)
-        ++ robotPics     
-        ++ projPics      
-        ++ explosionPics 
-        ++ [powerUpPic]  
-        
-        -- UI (se dibuja al final de todo, para que esté por encima)
-        ++ [controlsPic]
+     Pictures $
+       [ -- Fondo y borde
+         Translate (worldW / 2) (worldH / 2) $
+         Scale (worldW / bgWidth) (worldH / bgHeight) (aBgImage assets)
+       , mapBorder 
+       ]
+       -- Entidades (Obstáculos primero, para que los robots pasen por encima visualmente)
+       ++ obstaclePics
+       ++ robotPics      
+       ++ [drawTeslaBeams gs]
+       ++ projPics      
+       ++ explosionPics 
+       ++ [powerUpPic]  
+       
+       -- UI (al final)
+       ++ [controlsPic]
 
 -- Dibuja la UI de controles del jugador
 drawPlayerControls :: GameState -> Picture
@@ -310,11 +344,11 @@ drawPlayerControls gs =
         boxPadding = 10.0
 
         textPics = zipWith (\lineText lineNum ->
-                    Translate 0 (-lineNum * lineHeight) $
-                    Scale 0.12 0.12 $
-                    Color white $
-                    Text lineText
-                   ) controls [0..]
+                     Translate 0 (-lineNum * lineHeight) $
+                     Scale 0.12 0.12 $
+                     Color white $
+                     Text lineText
+                     ) controls [0..]
 
         -- Posición de la esquina inferior derecha del mundo
         bottomRightX = worldW + 20
@@ -332,17 +366,17 @@ drawPlayerControls gs =
           ]
 
 -- Dibuja un robot individual, su UI y sus efectos
-drawRobot :: GameAssets -> Robot -> Picture
-drawRobot assets r =
+drawRobot :: GameAssets -> GameState -> Robot -> Picture
+drawRobot assets gs r =
   let
-    -- Propiedades base
+    -- Propiedades base (sin cambios)
     base = robotBase r
     (x, y) = unV2 (objPos base)
     (w, h) = unV2 (objSize base)
     angleDeg = negate $ rad2deg (objAngle base)
     turretAngleDeg = negate $ rad2deg (turretAngle r)
 
-    -- Selección de estado e imagen
+    -- Selección de estado e imagen (sin cambios)
     isPlayer = robotBehavior r == PLAYER
     isHit = (robotHitTimer r > 0) && (robotHitTimer r `mod` 8 < 4)
 
@@ -352,39 +386,69 @@ drawRobot assets r =
       (False, True)  -> aAIChasisHitImage assets
       (False, False) -> aAIChasisImage assets
 
-    selectedTurretImage = if robotBehavior r == RAMMER then Blank else
+    selectedTurretImage = if robotBehavior r == RAMMER then Blank else -- Los RAMMER no tienen torreta visual
       case (isPlayer, isHit) of
         (_,     True)  -> aTurretHitImage assets
         (True,  False) -> aPlayerTurretImage assets
         (False, False) -> aAITurretImage assets
 
-    -- Dimensiones de la imagen (dependen del tipo)
+    -- Dimensiones de la imagen (sin cambios)
     (imgW, imgH) = if isPlayer
                    then (playerChasisImgWidth, playerChasisImgHeight)
                    else (aiChasisImgWidth, aiChasisImgHeight)
 
-    -- Dibujo del chasis
+    -- Dibujo del chasis (sin cambios)
     baseChasis = Scale (w / imgW) (h / imgH) selectedChasisImage
-    rammerDecals = Pictures
-      [ Translate (w * 0.25) (h * 0.15) $ Rotate (-30) $ Color (dark red) $ rectangleSolid (w * 0.4) (h * 0.2)
-      , Translate (w * 0.25) (h * (-0.15)) $ Rotate 30 $ Color (dark red) $ rectangleSolid (w * 0.4) (h * 0.2)
-      ]
+    rammerDecals = Pictures [Translate (w * 0.25) (h * 0.15) $ Rotate (-30) $ Color (dark red) $ rectangleSolid (w * 0.4) (h * 0.2)
+        , Translate (w * 0.25) (h * (-0.15)) $ Rotate 30 $ Color (dark red) $ rectangleSolid (w * 0.4) (h * 0.2)]
     body = Translate x y $ Rotate angleDeg $
-           if robotBehavior r == RAMMER
-           then Pictures [ baseChasis, rammerDecals ]
-           else baseChasis
+             if robotBehavior r == RAMMER
+             then Pictures [ baseChasis, rammerDecals ]
+             else baseChasis
 
-    -- Dibujo de la torreta
+    -- Overlay azul de ralentización
+    slowActive =
+      let isTesla = case Map.lookup "teslaSlow" (robotMem r) of
+                      Just (MInt v) | v > 0 -> True
+                      _ -> False
+          isStorm = case Map.lookup "stormSlow" (robotMem r) of
+                      Just (MInt v) | v > 0 -> True
+                      _ -> False
+      in isTesla || isStorm
+    blueOverlayScaled = Scale (w / playerChasisImgWidth) (h / playerChasisImgHeight) (aBlueChasisOverlay assets)
+    blueOverlay = if slowActive
+                    then Translate x y $ Rotate angleDeg $ Color (withAlpha 0.45 white) blueOverlayScaled
+                    else Blank
+
+    -- Dibujo de la torreta (sin cambios)
     (turretWidth, turretHeight) = unV2 (getTurretSize (robotType r))
     turret = Translate x y $ Rotate turretAngleDeg $ Rotate 180 $
              Scale (turretWidth / turretImgWidth) (turretHeight / turretImgHeight) $
              selectedTurretImage
 
-    -- Helpers
+    -- Overlay azul para la torreta cuando está ralentizado
+    turretBlueOverlayPic = if slowActive
+                              then Translate x y $ Rotate turretAngleDeg $ Rotate 180 $
+                                   Color (withAlpha 0.45 white) $
+                                   Scale (turretWidth / turretImgWidth) (turretHeight / turretImgHeight) $
+                                   aTurretBlueOverlay assets
+                              else Blank
+
+    -- --- NUEVO: Dibujo de la Hitbox ---
+    hitboxVerts = robotVerts r -- Obtener los vértices de la hitbox
+    hitboxPoints = map unV2 hitboxVerts -- Convertir V2 Float a (Float, Float)
+    -- Dibuja líneas conectando los puntos, cerrando el polígono
+    hitboxPic = if gsShowHitboxes gs then -- <<< USA EL FLAG
+                  Color yellow $ Line (hitboxPoints ++ [head hitboxPoints])
+                else
+                  Blank
+
+    -- Helpers (sin cambios)
     effects = drawRobotEffects r
     ui = drawRobotUI (aBulletImage assets) r
 
-  in Pictures [body, turret, effects, ui]
+  -- Añadimos 'hitboxPic' al final para que se dibuje encima
+  in Pictures [body, blueOverlay, turret, turretBlueOverlayPic, effects, ui, hitboxPic]
 
 -- Dibuja los efectos visuales (escudo, velocidad) de un robot
 drawRobotEffects :: Robot -> Picture
@@ -397,17 +461,20 @@ drawRobotEffects r =
 
     shieldActive = robotShieldTimer r > 0
     speedActive = robotSpeedBoostTimer r > 0
+    slowActive = case Map.lookup "teslaSlow" (robotMem r) of
+                   Just (MInt v) | v > 0 -> True
+                   _ -> False
 
     shieldOverlay = if shieldActive
                       then Color (withAlpha 0.4 blue) $ circle (max w h * 0.7)
                       else Blank
 
     speedOverlay = if speedActive
-                      then Color (withAlpha 0.6 cyan) $ Pictures
-                           [ Translate (-w * 0.6) (h * 0.1) $ rectangleSolid (w * 0.3) (h * 0.1)
-                           , Translate (-w * 0.6) (-h * 0.1) $ rectangleSolid (w * 0.3) (h * 0.1)
-                           ]
-                      else Blank
+                     then Color (withAlpha 0.6 cyan) $ Pictures
+                          [ Translate (-w * 0.6) (h * 0.1) $ rectangleSolid (w * 0.3) (h * 0.1)
+                          , Translate (-w * 0.6) (-h * 0.1) $ rectangleSolid (w * 0.3) (h * 0.1)
+                          ]
+                     else Blank
 
   in Translate x y $ Rotate angleDeg $ Pictures [shieldOverlay, speedOverlay]
 
@@ -477,9 +544,9 @@ drawRobotUI bulletImage r =
              drawReloadAnimation
           else
              if robotAmmo r <= 0 then
-                drawText "(!)" red
+               drawText "(!)" red
              else
-                drawBulletIcons
+               drawBulletIcons
 
     -- Etiqueta de Nombre
     textString = robotName r
@@ -532,6 +599,137 @@ drawExplosion explosionFrames e =
     frameH_enPantalla = radius * 2.0
     scaleFactor = frameH_enPantalla / explosionFrameHeight
 
+-- Dibuja un obstáculo
+drawObstacle :: GameAssets -> GameState -> Obstacle -> Picture
+drawObstacle assets gs o =
+  let (V2 (x, y)) = obsPos o
+      (V2 (w, h)) = obsSize o
+
+      -- Dimensiones originales de las imágenes
+      wallImgW = 786.0
+      wallImgH = 257.0
+      damageRectImgW = 648.0
+      damageRectImgH = 548.0
+      damageImgW = 579.0 -- (Circular)
+      damageImgH = 634.0
+      minaImgSize = 512.0
+
+      (obstacleSprite, hitboxShape) = case obsType o of
+          WALL ->
+            let 
+                wallPic = aObstacleWallPic assets
+                -- Lógica de rotación y escalado
+                sprite = if h > w then
+                           let scaleX = w / wallImgH
+                               scaleY = h / wallImgW
+                           in Translate x y $ Rotate 90 $ Scale scaleX scaleY wallPic
+                         else
+                           let scaleX = w / wallImgW
+                               scaleY = h / wallImgH
+                           in Translate x y $ Scale scaleX scaleY wallPic
+                
+                -- Hitbox rectangular
+                hitboxVerts = obsVerts o
+                hitboxPoints = map unV2 hitboxVerts
+                shape = Line (hitboxPoints ++ [head hitboxPoints])
+            in (sprite, Color yellow shape)
+
+          DAMAGE_ZONE_RECT ->
+            let
+                damageRectPic = aObstacleDamageRectPic assets
+                -- Escalar para ajustar al tamaño (w, h) basado en las dimensiones de la imagen
+                scaleX = w / damageRectImgW
+                scaleY = h / damageRectImgH
+                sprite = Translate x y $ Scale scaleX scaleY damageRectPic
+                
+                -- Hitbox rectangular (igual que WALL)
+                hitboxVerts = obsVerts o
+                hitboxPoints = map unV2 hitboxVerts
+                shape = Line (hitboxPoints ++ [head hitboxPoints])
+            in (sprite, Color (dark orange) shape)
+
+          -- Zona de daño circular (imagen)
+          DAMAGE_ZONE ->
+            let 
+                damagePic = aObstacleDamagePic assets
+                -- Para el círculo, w y h son iguales (ratio 1.0)
+                -- Escalamos la imagen para que quepa en el diámetro (w)
+                scale = w / (max damageImgW damageImgH) -- Escala uniforme
+                sprite = Translate x y $ Scale scale scale damagePic
+                
+                radius = w * 0.5
+                shape = thickCircle radius 1.5
+            in (sprite, Translate x y $ Color (dark magenta) shape)
+
+          -- Zona de tormenta
+          STORM_ZONE ->
+            let
+                stormImgSize = 512.0
+                scale = w / stormImgSize
+                sprite = Translate x y $ Scale scale scale (aObstacleStormPic assets)
+                radius  = w * 0.5
+                shape   = thickCircle radius 1.5
+            in (sprite, Translate x y $ Color blue shape)
+
+          MINA_INACTIVA ->
+            let
+                scale = w / minaImgSize -- 'w' es el diámetro (W=H para círculos)
+                sprite = Translate x y $ Scale scale scale (aMinaInactivaPic assets)
+                radius = w * 0.5
+                shape = thickCircle radius 1.5
+            in (sprite, Translate x y $ Color yellow shape) -- Hitbox amarilla
+
+          MINA_ACTIVA c ->
+            let
+                pic = if c `mod` 20 < 10 -- Parpadea cada 10 frames
+                      then aMinaActivaPic assets
+                      else Blank -- Desaparece
+                scale = w / minaImgSize
+                sprite = Translate x y $ Scale scale scale pic
+                radius = w * 0.5
+                shape = thickCircle radius 1.5
+            in (sprite, Translate x y $ Color red shape) -- Hitbox roja
+
+          -- Torre Tesla. El rango solo se muestra cuando gsShowHitboxes = True (va en hitboxShape)
+          TORRE_TESLA{ teslaRange = rng } ->
+            let
+                teslaImgSize = 512.0
+                scale = w / teslaImgSize
+                sprite = Translate x y $ Scale scale scale (aObstacleTeslaPic assets)
+                radius = w * 0.5
+                hitShape = Color cyan (thickCircle radius 1.5)
+                rangeShape = Color (withAlpha 0.25 cyan) (thickCircle rng 2)
+                combined = Pictures [Translate x y hitShape, Translate x y rangeShape]
+            in (sprite, combined)
+
+      hitboxPic = if gsShowHitboxes gs then hitboxShape else Blank
+
+  -- Dibuja el sprite primero, luego el hitbox encima
+  in Pictures [obstacleSprite, hitboxPic]
+
+-- Dibuja los rayos azules de las torres Tesla hacia los robots afectados
+drawTeslaBeams :: GameState -> Picture
+drawTeslaBeams gs = Pictures (mapMaybe beamForTower (obstacles gs))
+  where
+    beamForTower :: Obstacle -> Maybe Picture
+    beamForTower o = case obsType o of
+      TORRE_TESLA{ teslaRange = rng } ->
+        let pT@(V2 (tx,ty)) = obsPos o
+            slowedRobots = [ r | r <- robots gs
+                             , isRobotAlive r
+                             , let m = Map.lookup "teslaSlow" (robotMem r)
+                             , case m of { Just (MInt v) -> v > 0; _ -> False }
+                             , distance (objPos $ robotBase r) pT < rng ]
+        in case nearestTo pT slowedRobots of
+             Just r -> let (V2 (rx,ry)) = objPos (robotBase r)
+                       in Just $ Color (withAlpha 0.95 blue) $ Line [(tx,ty),(rx,ry)]
+             Nothing -> Nothing
+      _ -> Nothing
+
+    nearestTo _ [] = Nothing
+    nearestTo p (r:rs) = Just (foldl (closer p) r rs)
+    closer p a b = if distance (objPos $ robotBase a) p <= distance (objPos $ robotBase b) p then a else b
+
 -------------------------------------------------------------------------------
 -- Manejador de Eventos (Input)
 -------------------------------------------------------------------------------
@@ -564,11 +762,11 @@ eventHandlerGame (EventKey (Char key) keyState _ _) gs =
         relevantKeys = Set.fromList ['w', 'a', 's', 'd']
         currentKeys = playerKeys gs
     in if Set.member lowerKey relevantKeys then
-            case keyState of
+           case keyState of
                 Down -> gs { playerKeys = Set.insert lowerKey currentKeys }
                 Up   -> gs { playerKeys = Set.delete lowerKey currentKeys }
        else
-            gs
+           gs
 
 -- Disparo del Jugador (Clic Izquierdo)
 eventHandlerGame (EventKey (MouseButton LeftButton) Down _ _) gs =
@@ -625,8 +823,8 @@ behaviors = [AGGRESSIVE, BALANCED, DEFENSIVE, PEACEFUL, RAMMER]
 
 nextBehavior :: IABehavior -> IABehavior
 nextBehavior b = case dropWhile (/= b) (behaviors ++ [head behaviors]) of
-                  (_:x:_) -> x
-                  _       -> head behaviors
+                   (_:x:_) -> x
+                   _       -> head behaviors
 
 -- Dibuja un botón genérico
 button :: Float -> Float -> Float -> Float -> Color -> String -> Picture
@@ -663,9 +861,9 @@ checkbox cx cy size isChecked =
   let border = Color (greyN 0.8) $ rectangleWire size size
       checkMark = if isChecked
                     then Color cyan $ Pictures
-                               [ Rotate 45  $ rectangleSolid (size * 0.7) (size * 0.15)
-                               , Rotate (-45) $ rectangleSolid (size * 0.7) (size * 0.15)
-                               ]
+                                  [ Rotate 45  $ rectangleSolid (size * 0.7) (size * 0.15)
+                                  , Rotate (-45) $ rectangleSolid (size * 0.7) (size * 0.15)
+                                  ]
                     else Blank
   in Translate cx cy $ Pictures [border, checkMark]
 
@@ -738,6 +936,8 @@ drawMenuConfig ms =
       playY  = - panelH / 2 + panelPad + 55
       powerUpCheckY = playY - 45
       powerUpCheckX = 0
+      hitboxCheckY = powerUpCheckY
+      hitboxCheckX = -200
 
       panel = Pictures [ Color (withAlpha 0.85 (dark (dark azure))) $ rectangleSolid panelW panelH
                        , Color (withAlpha 0.95 white) $ rectangleWire panelW panelH ]
@@ -780,9 +980,13 @@ drawMenuConfig ms =
         , Translate 100 (playY - 65) $ Scale 0.1 0.1 $
             Color (if hasPlayer then cyan else greyN 0.7) $
             Text (if hasPlayer then "Un jugador seleccionado" else "Marca la casilla para ser jugador")
-        , Translate powerUpCheckX powerUpCheckY $ Pictures
-            [ checkbox (-60) 0 (rowH * 0.6) (msPowerUpsEnabled ms)
-            , Translate (-40) (-5) $ Scale 0.1 0.1 $ Color white $ Text "Activar Powerups"
+        , Translate powerUpCheckX powerUpCheckY $ Pictures -- Checkbox Powerups
+            [ checkbox (-80) 0 (rowH * 0.6) (msPowerUpsEnabled ms)
+            , Translate (-60) (-5) $ Scale 0.1 0.1 $ Color white $ Text "Activar Powerups"
+            ]
+        , Translate hitboxCheckX hitboxCheckY $ Pictures
+            [ checkbox (-80) 0 (rowH * 0.6) (msShowHitboxes ms)
+            , Translate (-60) (-5) $ Scale 0.1 0.1 $ Color white $ Text "Mostrar Hitboxes"
             ]
         ]
   in Pictures ([panel, title, headerLabels] ++ rowPics ++ [footer])
@@ -816,8 +1020,8 @@ drawGameOver winM =
 -- Función principal de dibujo: decide qué pantalla dibujar
 drawApp :: GameAssets -> AppState -> Picture
 drawApp assets appState = case appState of
-  InMenu ms     -> Pictures [ drawMenuBg (msWidth ms, msHeight ms), drawMenu ms ]
-  InGame gs     -> drawGame assets gs
+  InMenu ms    -> Pictures [ drawMenuBg (msWidth ms, msHeight ms), drawMenu ms ]
+  InGame gs    -> drawGame assets gs
   GameOver winM -> Pictures [ drawMenuBg defaultResolution, drawGameOver winM ]
   where
     -- Dibuja el fondo escalado y oscurecido para los menús
@@ -851,31 +1055,31 @@ eventHandler ev st@(InMenu ms) = case msMode ms of
       case ev of
         EventKey (MouseButton LeftButton) Down _ (mx, my) ->
           let
-              -- Coordenadas de los botones (deben coincidir con drawMenuHome)
-              homeH = 350
-              topY  = homeH / 2
-              titleY = topY - 45
-              resY   = titleY - 65
-              startY = resY - 70
-              exitY  = startY - 55
-              resBtnW = 40
-              resBtnH = rowH
-              resLeftX = -80
-              resRightX = 80
+            -- Coordenadas de los botones (deben coincidir con drawMenuHome)
+            homeH = 350
+            topY  = homeH / 2
+            titleY = topY - 45
+            resY   = titleY - 65
+            startY = resY - 70
+            exitY  = startY - 55
+            resBtnW = 40
+            resBtnH = rowH
+            resLeftX = -80
+            resRightX = 80
 
-              clickedResLeft  = inRect mx my resLeftX (resY - 15) resBtnW resBtnH
-              clickedResRight = inRect mx my resRightX (resY - 15) resBtnW resBtnH
-              clickedStart = inRect mx my 0 startY 240 44
-              clickedExit  = inRect mx my 0 exitY  160 40
+            clickedResLeft  = inRect mx my resLeftX (resY - 15) resBtnW resBtnH
+            clickedResRight = inRect mx my resRightX (resY - 15) resBtnW resBtnH
+            clickedStart = inRect mx my 0 startY 240 44
+            clickedExit  = inRect mx my 0 exitY  160 40
 
-              -- Lógica para ciclar resoluciones
-              cycleResolution :: Int -> MenuState -> MenuState
-              cycleResolution dir ms' =
-                let currentRes = (msWidth ms', msHeight ms')
-                    currentIndex = fromMaybe 0 $ findIndex (== currentRes) availableResolutions
-                    newIndex = (currentIndex + dir + length availableResolutions) `mod` length availableResolutions
-                    (newW, newH) = availableResolutions !! newIndex
-                in ms' { msWidth = newW, msHeight = newH }
+            -- Lógica para ciclar resoluciones
+            cycleResolution :: Int -> MenuState -> MenuState
+            cycleResolution dir ms' =
+              let currentRes = (msWidth ms', msHeight ms')
+                  currentIndex = fromMaybe 0 $ findIndex (== currentRes) availableResolutions
+                  newIndex = (currentIndex + dir + length availableResolutions) `mod` length availableResolutions
+                  (newW, newH) = availableResolutions !! newIndex
+              in ms' { msWidth = newW, msHeight = newH }
 
           in if clickedStart then InMenu ms { msMode = MenuConfig }
              else if clickedExit then unsafePerformIO (exitSuccess >> return st)
@@ -908,10 +1112,14 @@ eventHandler ev st@(InMenu ms) = case msMode ms of
               powerUpCheckX = -60
               checkSize = rowH * 0.7
               powerUpCheckSize = rowH * 0.6
+              hitboxCheckY = powerUpCheckY
+              hitboxCheckX = -280
+              hitboxCheckSize = powerUpCheckSize
 
               clickedAdd  = inRect mx my addX addY 170 32
-              clickedPlay = inRect mx my 0    playY 240 42
+              clickedPlay = inRect mx my 0   playY 240 42
               clickedPowerUpCheck = inRect mx my powerUpCheckX powerUpCheckY powerUpCheckSize powerUpCheckSize
+              clickedHitboxCheck = inRect mx my hitboxCheckX hitboxCheckY hitboxCheckSize hitboxCheckSize
 
               hasPlayer = isJust $ findIndex (\cfg -> tcBehavior cfg == PLAYER) cfgs
 
@@ -938,24 +1146,29 @@ eventHandler ev st@(InMenu ms) = case msMode ms of
               newCfgs = [ applyRowClicks i c (rowsStartY - fromIntegral i * stepY + 50) | (i,c) <- zip [0..] cfgs ]
               intermediateMs = ms { msConfigs = newCfgs }
               afterPowerUpMs = if clickedPowerUpCheck
-                                  then intermediateMs { msPowerUpsEnabled = not (msPowerUpsEnabled intermediateMs) }
-                                  else intermediateMs
+                                   then intermediateMs { msPowerUpsEnabled = not (msPowerUpsEnabled intermediateMs) }
+                                   else intermediateMs
+
+              finalMs = if clickedHitboxCheck
+                                  then afterPowerUpMs { msShowHitboxes = not (msShowHitboxes afterPowerUpMs) }
+                                  else afterPowerUpMs
 
           in if clickedAdd && len < maxRows then
-                InMenu afterPowerUpMs { msConfigs = msConfigs afterPowerUpMs ++ [TankConfig MEDIUM BALANCED] }
+               InMenu afterPowerUpMs { msConfigs = msConfigs afterPowerUpMs ++ [TankConfig MEDIUM BALANCED] }
 
              else if clickedPlay && len >= 2 then
-                -- Inicia el juego
-                let currentWidth = msWidth afterPowerUpMs
-                    currentHeight = msHeight afterPowerUpMs
-                    enablePowerups = msPowerUpsEnabled afterPowerUpMs
-                    newStateIO = do
-                      gs <- startGameFromConfigs currentWidth currentHeight enablePowerups (msConfigs afterPowerUpMs)
-                      return (InGame gs)
-                in unsafePerformIO newStateIO
+               -- Inicia el juego
+               let currentWidth = msWidth afterPowerUpMs
+                   currentHeight = msHeight afterPowerUpMs
+                   enablePowerups = msPowerUpsEnabled afterPowerUpMs
+                   showHitboxesFlag = msShowHitboxes finalMs
+                   newStateIO = do
+                     gs <- startGameFromConfigs currentWidth currentHeight enablePowerups showHitboxesFlag (msConfigs finalMs)
+                     return (InGame gs)
+               in unsafePerformIO newStateIO
 
              else
-                InMenu afterPowerUpMs
+               InMenu finalMs
         _ -> InMenu ms
 
 -- Eventos 'GameOver'
@@ -986,9 +1199,10 @@ updateHandler dt (InGame gs) =
 
       -- Comprueba si hay un ganador
       winnerName = case alive of
-                      [r] -> Just (robotName r) -- Queda 1: ganador
-                      []  -> Nothing            -- Quedan 0: empate
-                      _   -> Nothing            -- Quedan >1: el juego continúa
+                         [r] -> Just (robotName r) -- Queda 1: ganador
+                         []  -> Nothing            -- Quedan 0: empate
+                         _   -> Nothing            -- Quedan >1: el juego continúa
 
   in if numAlive <= 1 then GameOver winnerName else InGame gs'
 updateHandler _ st@(GameOver _) = st -- GameOver no se actualiza
+

@@ -23,14 +23,14 @@ instance Applicative V2 where
 
 -- --- Aliases de tipos para claridad ---
 
-type Point     = V2 Float -- Un punto en el espacio 2D
-type Vector    = V2 Float -- Un vector para velocidad o dirección
-type Angle     = Float    -- Un ángulo en radianes
-type Distance  = Float    -- Una distancia
-type Size      = V2 Float -- Dimensiones (ancho, alto)
-type Position  = Point    -- Posición de un objeto
-type Rectangle = [Point]  -- Una lista de puntos (vértices) para definir una forma
-type Life      = Int      -- Vida o duración (en frames)
+type Point       = V2 Float -- Un punto en el espacio 2D
+type Vector      = V2 Float -- Un vector para velocidad o dirección
+type Angle       = Float    -- Un ángulo en radianes
+type Distance    = Float    -- Una distancia
+type Size        = V2 Float -- Dimensiones (ancho, alto)
+type Position    = Point    -- Posición de un objeto
+type Rectangle   = [Point]  -- Una lista de puntos (vértices) para definir una forma
+type Life        = Int      -- Vida o duración (en frames)
 
 -- --- Estructuras de Datos Principales ---
 
@@ -79,8 +79,10 @@ data Robot = Robot
   , robotHitTimer :: Int      -- Temporizador para visualización de "hit"
   , robotCollisionTimer :: Int -- Temporizador para cooldown de colisión
   , robotReloadTimer :: Int  -- Temporizador para la recarga de munición
-  , robotSpeedBoostTimer :: Int -- Duración restante del power-up de velocidad
-  , robotShieldTimer :: Int   -- Duración restante del power-up de escudo
+  , robotObstacleCollisionTimer :: Int -- Temporizador de inmunidad al daño de obstáculos
+  , robotSpeedBoostTimer :: Int -- Duración restante del power-up de velocidad recogido
+  , robotShieldTimer :: Int    -- Duración restante del power-up de escudo recogido
+  , robotStuckTimer :: Int    -- Temporizador para detectar atascos
   } deriving (Show, Eq)
 
 -- Representa una bala disparada.
@@ -104,6 +106,7 @@ data GameState = GameState
     robots      :: [Robot]
   , projectiles :: [Projectile]
   , explosions  :: [Explosion]
+  , obstacles   :: [Obstacle]
     -- Configuración del mundo
   , gameDimensions :: Size -- Dimensiones del campo de batalla
     -- Estado de entrada del jugador
@@ -114,6 +117,7 @@ data GameState = GameState
   , powerUpsEnabled :: Bool      -- Configuración: ¿Están habilitados los power-ups?
   , powerUp :: Maybe PowerUp -- El power-up actualmente activo en el mapa
   , powerUpSpawnTimer :: Int   -- Temporizador hasta que aparezca el próximo power-up
+  , gsShowHitboxes :: Bool -- Si se deben dibujar las hitboxes
   } deriving (Show)
 
 
@@ -154,12 +158,13 @@ data CollisionEvent
     = ROBOT_PROJECTILE Robot Projectile -- Un robot es golpeado por un proyectil
     | ROBOT_ROBOT Robot Robot       -- Dos robots colisionan
     | ROBOT_EXPLOSION Robot Explosion -- Un robot es alcanzado por una explosión
-    | ROBOT_POWERUP Robot PowerUp   -- Un robot recoge un power-up
+    | ROBOT_POWERUP Robot PowerUp     -- Un robot recoge un power-up
+    | ROBOT_OBSTACLE Robot Obstacle   -- Un robot colisiona con un obstáculo
+    | PROJECTILE_OBSTACLE Projectile Obstacle  -- Un projectile choca con un obstáculo (no atravesable)
     deriving (Eq, Show)
 
 -- Errores que pueden ocurrir al crear entidades.
 data CreationError = InvalidHealth Float | InvalidDamage Float | NegativeRadar Float deriving (Show, Eq)
-
 
 -- --- Power-ups ---
 
@@ -175,13 +180,37 @@ data PowerUp = PowerUp
   , puTimer  :: Int      -- Cuánto tiempo permanece antes de reubicarse
   } deriving (Show, Eq)
 
+-- --- Obstáculos ---
+
+-- Tipos de Obstáculos
+data ObstacleType = WALL             -- Bloquea (Rectangular)
+                  | DAMAGE_ZONE_RECT -- Daña (Rectangular)
+                  | DAMAGE_ZONE      -- Daña (Circular)
+                  -- MODIFICACIÓN PARA MINAS:
+                  | MINA_INACTIVA    -- (Circular) Mina esperando ser pisada
+                  | MINA_ACTIVA { contador :: Int } -- (Circular) Mina en cuenta atrás
+                  | TORRE_TESLA
+                        { teslaRange    :: Float   -- radio del campo eléctrico
+                        , teslaCooldown :: Int     -- tiempo entre disparos (frames)
+                        , teslaTimer    :: Int     -- contador interno actual
+                        }
+                  | STORM_ZONE       -- Zona de tormenta (ralentiza, circular)
+                  deriving (Show, Eq)
+
+-- Representa un obstáculo en el mapa
+data Obstacle = Obstacle
+  { obsId    :: Int          -- Identificador único
+  , obsType  :: ObstacleType -- Tipo de obstáculo
+  , obsPos   :: Position     -- Posición (centro)
+  , obsSize  :: Size         -- Dimensiones (ancho, alto)
+  , obsVerts :: Rectangle    -- Vértices (hitbox rectangular)
+  } deriving (Show, Eq)
 
 -- --- Funciones Auxiliares ---
 
 -- Comprueba si un robot sigue vivo.
 isRobotAlive :: Robot -> Bool
 isRobotAlive r = robotHealth r > 0
-
 
 -- --- === Constantes de Balance del Juego === ---
 -- Estas funciones definen las estadísticas de cada tipo de robot.
@@ -217,9 +246,9 @@ getFireCooldown t = case t of
 -- Velocidad Máxima (unidades por segundo).
 getMaxSpeed :: RobotType -> Float
 getMaxSpeed t = case t of
-    LIGHT  -> 65.0 -- Más rápido
-    MEDIUM -> 50.0
-    HEAVY  -> 35.0 -- Más lento
+    LIGHT  -> 78.0 -- Más rápido
+    MEDIUM -> 60.0
+    HEAVY  -> 42.0 -- Más lento
 
 -- Velocidad de Rotación de Torreta (radianes por frame).
 getTurretRotationSpeed :: RobotType -> Angle

@@ -28,25 +28,11 @@ detectRobotProjectileCollisions gs =
   [ ROBOT_PROJECTILE r p
   | r <- robots gs, isRobotAlive r -- Para cada robot vivo
   , p <- projectiles gs -- Para cada proyectil
-  , projOwner p /= objId (robotBase r) -- Evitar fuego amigo (el proyectil no es del propio robot)
+  , projOwner p /= objId (robotBase r) -- Evitar fuego amigo
   -- Comprobar colisión SAT (manejando el 'Maybe Bool')
+  -- Usa el helper 'projectileRect'
   , fromMaybe False (checkCollision (robotRectangle r) (projectileRect p))
   ]
-  where
-    -- Helper para crear el 'hitbox' (Rectangle) de un proyectil
-    projectileRect :: Projectile -> Rectangle
-    projectileRect p =
-      let base = projBase p
-          (V2 (w,h)) = objSize base
-          halfW = max 2 (w*0.5) -- Asegurar un tamaño mínimo de hitbox
-          halfH = max 2 (h*0.5)
-          V2 (cx,cy) = objPos base
-          -- Rectángulo base (sin rotar) centrado en la posición
-          rect0 = [ v2 (cx - halfW) (cy - halfH)
-                  , v2 (cx + halfW) (cy - halfH)
-                  , v2 (cx + halfW) (cy + halfH)
-                  , v2 (cx - halfW) (cy + halfH) ]
-      in rotateRectangle rect0 (objPos base) (objAngle base)
 
 -- ---------- Detección de Colisiones: Robot-Robot ----------
 detectRobotRobotCollisions :: GameState -> [CollisionEvent]
@@ -96,6 +82,62 @@ detectRobotExplosionCollisions gs =
       toEvent :: (Robot, Explosion) -> CollisionEvent
       toEvent (robot, explosion) = ROBOT_EXPLOSION robot explosion
 
+-- ---------- Detección de Colisiones: Robot-Obstáculo ----------
+detectRobotObstacleCollisions :: GameState -> [CollisionEvent]
+detectRobotObstacleCollisions gs =
+  [ ROBOT_OBSTACLE r o
+  | r <- robots gs, isRobotAlive r -- Para cada robot vivo
+  , o <- obstacles gs              -- Para cada obstáculo
+  -- Comprueba la colisión basado en el tipo de obstáculo
+  , checkRobotObstacleCollision r o
+  ]
+
+-- Helper para gestionar colisión Robot-Obstáculo (Rect vs Circ)
+checkRobotObstacleCollision :: Robot -> Obstacle -> Bool
+checkRobotObstacleCollision r o = 
+  let
+    -- Lógica común para colisión circular
+    checkCircularCollision = 
+      let
+        -- Aproximación circular para el robot
+        (V2 (rw, rh)) = objSize (robotBase r)
+        robotRadius = max rw rh * 0.5 -- Radio simple
+        robotPos = objPos (robotBase r)
+        
+        -- Círculo del obstáculo
+        obstaclePos = obsPos o
+        (V2 (ow, _)) = obsSize o -- El radio se basa en el ancho (ya que W=H)
+        obstacleRadius = ow * 0.5
+        
+        -- Comprobación de colisión Círculo-Círculo
+        dist = distance robotPos obstaclePos
+      in
+        dist < (robotRadius + obstacleRadius)
+  in
+    case obsType o of
+      -- Casos Rectangulares: Usar SAT (checkCollision)
+      WALL -> fromMaybe False (checkCollision (robotVerts r) (obsVerts o))
+      DAMAGE_ZONE_RECT -> fromMaybe False (checkCollision (robotVerts r) (obsVerts o))
+      
+      -- Casos Circulares: Usar helper 'checkCircularCollision'
+      DAMAGE_ZONE -> checkCircularCollision
+      STORM_ZONE  -> checkCircularCollision
+      MINA_INACTIVA -> checkCircularCollision
+      MINA_ACTIVA _ -> checkCircularCollision
+      TORRE_TESLA{} -> checkCircularCollision
+
+-- ---------- Detección de Colisiones: Proyectil-Obstáculo ----------
+detectProjectileObstacleCollisions :: GameState -> [CollisionEvent]
+detectProjectileObstacleCollisions gs =
+  [ PROJECTILE_OBSTACLE p o
+  | p <- projectiles gs -- Para cada proyectil
+  , o <- obstacles gs   -- Para cada obstáculo
+  -- Los proyectiles deben chocar con WALL y DAMAGE_ZONE_RECT (ambos rect)
+  , (case obsType o of { WALL -> True; DAMAGE_ZONE_RECT -> True; TORRE_TESLA{} -> True; _ -> False })
+  -- Comprobar colisión SAT (rectangular)
+  , fromMaybe False (checkCollision (projectileRect p) (obsVerts o))
+  ]
+
 -- ########## Agregador de Colisiones ##########
 
 -- Determina *todas* las colisiones que ocurren en el frame actual
@@ -104,7 +146,9 @@ checkCollisions gs =
   detectRobotProjectileCollisions gs ++
   detectRobotRobotCollisions gs ++
   detectRobotExplosionCollisions gs ++
-  detectRobotPowerUpCollisions gs
+  detectRobotPowerUpCollisions gs ++
+  detectRobotObstacleCollisions gs ++
+  detectProjectileObstacleCollisions gs
 
 -- ########## Funciones Auxiliares (Helpers) ##########
 
@@ -131,3 +175,18 @@ robotRectangle r =
 unorderedPairs :: [a] -> [(a,a)]
 unorderedPairs []     = []
 unorderedPairs (x:xs) = [(x,y) | y <- xs] ++ unorderedPairs xs
+
+-- Helper para crear el 'hitbox' (Rectangle) de un proyectil
+projectileRect :: Projectile -> Rectangle
+projectileRect p =
+  let base = projBase p
+      (V2 (w,h)) = objSize base
+      halfW = max 2 (w*0.5) -- Asegurar un tamaño mínimo de hitbox
+      halfH = max 2 (h*0.5)
+      V2 (cx,cy) = objPos base
+      -- Rectángulo base (sin rotar) centrado en la posición
+      rect0 = [ v2 (cx - halfW) (cy - halfH)
+              , v2 (cx + halfW) (cy - halfH)
+              , v2 (cx + halfW) (cy + halfH)
+              , v2 (cx - halfW) (cy + halfH) ]
+  in rotateRectangle rect0 (objPos base) (objAngle base)
