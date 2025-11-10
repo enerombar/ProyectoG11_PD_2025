@@ -1,0 +1,12 @@
+--- REPORTE FINAL DE TORNEOS --- 
+Rondas jugadas: 1
+
+--- DETALLE POR RONDA --- 
+  Ronda 1:
+    Ganador: R3
+    - R3: Impactos: 7, Tiempo Vivo: 0s (Ganador)
+
+
+--- ESTADÖSTICAS AGREGADAS (GLOBALES Y MEDIAS) --- 
+Formato: (Total Victorias / Total Impactos / Media Impactos / Media Tiempo Vivo)
+ ÿ- R3: 1 Victorias | 7 Impactos Totales | 7.0 Impactos (Media) | 0.0s Tiempo Vivo (Media)

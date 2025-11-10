@@ -1,4 +1,7 @@
-﻿module Logic where
+﻿-- Fichero: Logic.hs
+-- (VERSIÓN MODIFICADA - Reemplazar)
+
+module Logic where
 
 -- Importamos 'obstacles' de forma cualificada para evitar colisiones de nombres.
 -- Es decir, se importa todo el módulo Entities, pero 'obstacles' se accede como Entities.obstacles.
@@ -13,7 +16,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import System.Random (randomRIO)
 import System.IO.Unsafe (unsafePerformIO)
-import Data.Either (partitionEithers) -- MODIFICACIÓN: Añadido para las minas
+import Data.Either (partitionEithers) -- Añadido para las minas
 
 
 -- ########## Constantes ##########
@@ -137,11 +140,11 @@ updateVelocity r act =
       speedMultiplier = if boostActive then speedBoostFactor else 1.0
       -- Ralentizaciones: Tesla (leve) y Tormenta (fuerte)
       teslaMult = case Map.lookup "teslaSlow" (robotMem r) of
-                    Just (MInt v) | v > 0 -> 0.85 -- Ralentización leve
-                    _ -> 1.0
+                       Just (MInt v) | v > 0 -> 0.85 -- Ralentización leve
+                       _ -> 1.0
       stormMult = case Map.lookup "stormSlow" (robotMem r) of
-                    Just (MInt v) | v > 0 -> 0.65 -- Ralentización fuerte
-                    _ -> 1.0
+                       Just (MInt v) | v > 0 -> 0.65 -- Ralentización fuerte
+                       _ -> 1.0
       totalMultiplier = speedMultiplier * teslaMult * stormMult
   in case act of
     MOVE_FORWARD_ACTION ->
@@ -192,9 +195,9 @@ tryRotateRobotBy r d gs =
     -- 2. Comprobar colisión SÓLO con muros (WALL)
     wallObstacles = filter isBlockingObstacle (E.obstacles gs)
     isBlockingObstacle o = case obsType o of
-                              WALL -> True
-                              TORRE_TESLA{} -> True
-                              _ -> False
+                             WALL -> True
+                             TORRE_TESLA{} -> True
+                             _ -> False
     isCollidingWithWall = any (fromMaybe False . checkCollision newVerts . obsVerts) wallObstacles
 
     -- 3. Definir y comprobar colisión con bordes
@@ -223,29 +226,29 @@ tryRotateRobotBy r d gs =
 applyAction :: Robot -> ActionType -> GameState -> Robot
 applyAction r act gs = -- << AÑADIDO gs
   let result = case act of
-                STOP_ACTION             -> updateVelocity r act
-                MOVE_FORWARD_ACTION     -> updateVelocity r act
-                MOVE_BACKWARD_ACTION    -> updateVelocity r act
-                ROTATE_TURRET_ACTION d ->
-                  let maxRot = getTurretRotationSpeed (robotType r)
-                      normalized_d = normalizeAngle d
-                      -- Limita la rotación a la velocidad máxima (clamping)
-                      clamped_d = max (-maxRot) (min maxRot normalized_d)
-                  in rotateTurretBy r clamped_d
-                
-                ROTATE_ROBOT_ACTION d  ->
-                  let maxRot = getChassisRotationSpeed (robotType r)
-                      normalized_d = normalizeAngle d
-                      -- Limita la rotación a la velocidad máxima (clamping)
-                      clamped_d = max (-maxRot) (min maxRot normalized_d)
-                  -- Usa la nueva función que comprueba colisiones
-                  in tryRotateRobotBy r clamped_d gs
-                  
-                FIRE_ACTION             -> r -- Se maneja por separado en applyFireAction
-                RESET_WANDER_TIMER_ACTION -> r { robotWanderTimer = wanderTimerResetValue }
-                -- Acciones para la IA (memoria)
-                SET_MEMORY_ACTION key (Just val) -> r { robotMem = Map.insert key val (robotMem r) }
-                SET_MEMORY_ACTION key Nothing -> r { robotMem = Map.delete key (robotMem r) }
+                 STOP_ACTION            -> updateVelocity r act
+                 MOVE_FORWARD_ACTION    -> updateVelocity r act
+                 MOVE_BACKWARD_ACTION   -> updateVelocity r act
+                 ROTATE_TURRET_ACTION d ->
+                   let maxRot = getTurretRotationSpeed (robotType r)
+                       normalized_d = normalizeAngle d
+                       -- Limita la rotación a la velocidad máxima (clamping)
+                       clamped_d = max (-maxRot) (min maxRot normalized_d)
+                   in rotateTurretBy r clamped_d
+                 
+                 ROTATE_ROBOT_ACTION d  ->
+                   let maxRot = getChassisRotationSpeed (robotType r)
+                       normalized_d = normalizeAngle d
+                       -- Limita la rotación a la velocidad máxima (clamping)
+                       clamped_d = max (-maxRot) (min maxRot normalized_d)
+                   -- Usa la nueva función que comprueba colisiones
+                   in tryRotateRobotBy r clamped_d gs
+                   
+                 FIRE_ACTION            -> r -- Se maneja por separado en applyFireAction
+                 RESET_WANDER_TIMER_ACTION -> r { robotWanderTimer = wanderTimerResetValue }
+                 -- Acciones para la IA (memoria)
+                 SET_MEMORY_ACTION key (Just val) -> r { robotMem = Map.insert key val (robotMem r) }
+                 SET_MEMORY_ACTION key Nothing -> r { robotMem = Map.delete key (robotMem r) }
   in result
 
 -- Actualiza la posición del robot, manejando límites del mundo y colisiones con otros robots.
@@ -310,22 +313,16 @@ updatePosition gs r dt allRobots =
     isCollidingWithWall = any (fromMaybe False . checkCollision finalVertsAfterBorders . obsVerts) wallObstacles
 
   in
-    -- *** LÓGICA DE RESOLUCIÓN DE MOVIMIENTO MODIFICADA ***
+    -- *** LÓGICA DE RESOLUCIÓN DE MOVIMIENTO CORREGIDA ***
 
-    -- Caso 1: Colisión con Robot (sin ser RAMMER) -> Parada completa (comportamiento anterior)
-    if (isCollidingWithRobot && robotBehavior r /= RAMMER) then
-      -- Detener el robot (aplicar fricción) y mantenerlo en su posición *anterior* (antes del movimiento de este frame)
-      updateVelocity (r { robotBase = base { objPos = v2 x y } }) STOP_ACTION -- Se queda en (x,y)
-
-    -- Caso 2: Colisión con Muro (sin ser RAMMER) -> Lógica de deslizamiento
-    else if (isCollidingWithWall && robotBehavior r /= RAMMER) then
-        -- Intentar mover solo en X (usando la nueva X calculada, pero la Y antigua)
+    -- Caso 1: Colisión con Muro (TODOS los robots deben colisionar con muros)
+    if (isCollidingWithWall) then
+        -- Lógica de deslizamiento
         let
           posX_only = v2 finalX_afterBorders y -- (newX, oldY)
           vertsX_only = createRectangleRobot (robotType r) posX_only potentialAngle
           collidesX_only = any (fromMaybe False . checkCollision vertsX_only . obsVerts) wallObstacles
         
-        -- Intentar mover solo en Y (usando la X antigua, pero la nueva Y calculada)
           posY_only = v2 x finalY_afterBorders -- (oldX, newY)
           vertsY_only = createRectangleRobot (robotType r) posY_only potentialAngle
           collidesY_only = any (fromMaybe False . checkCollision vertsY_only . obsVerts) wallObstacles
@@ -344,14 +341,20 @@ updatePosition gs r dt allRobots =
             in r { robotBase = newBase, robotVerts = vertsY_only }
             
           else
-            -- Atascado en una esquina (ambos movimientos colisionan), parar
+            -- Atascado en una esquina, parar
             updateVelocity (r { robotBase = base { objPos = v2 x y } }) STOP_ACTION -- Se queda en (x,y)
 
-    -- Caso 3: Sin colisión bloqueante (o es RAMMER) -> Movimiento normal
+    -- Caso 2: Colisión con Robot (AHORA solo para no-Rammers)
+    else if (isCollidingWithRobot && robotBehavior r /= RAMMER) then
+      -- Detener el robot (aplicar fricción) y mantenerlo en su posición *anterior*
+      updateVelocity (r { robotBase = base { objPos = v2 x y } }) STOP_ACTION -- Se queda en (x,y)
+
+    -- Caso 3: Sin colisión bloqueante (o es un RAMMER colisionando con otro robot)
     else
-      -- Sin colisión bloqueante (o es RAMMER), actualizar a la posición/velocidad calculada tras los bordes
+      -- Movimiento normal
       let newBase = base { objPos = finalPosAfterBorders, objVel = finalVelAfterBorders }
-      in r { robotBase = newBase, robotVerts = finalVertsAfterBorders } -- Usa la posición/velocidad calculada
+      in r { robotBase = newBase, robotVerts = finalVertsAfterBorders }
+
 
 -- Genera un proyectil desde un robot.
 spawnProjectile :: Robot -> Either CreationError Projectile
@@ -374,7 +377,7 @@ spawnProjectile r =
         base = GameObject
             { objId = -1 -- Los proyectiles no necesitan IDs únicas (se gestionan por instancia)
             , objPos = spawnPos
-            , objVel = scaleV 200 dir           -- Velocidad del proyectil
+            , objVel = scaleV 200 dir         -- Velocidad del proyectil
             , objAngle = turretAng
             , objSize = projSize
             }
@@ -474,11 +477,11 @@ decreaseCooldown gs =
               -- Decrease custom slow timers in memory
               mem0 = robotMem r
               mem1 = case Map.lookup "teslaSlow" mem0 of
-                       Just (MInt v) -> if v > 0 then Map.insert "teslaSlow" (MInt (v - 1)) mem0 else Map.delete "teslaSlow" mem0
-                       _             -> mem0
+                         Just (MInt v) -> if v > 0 then Map.insert "teslaSlow" (MInt (v - 1)) mem0 else Map.delete "teslaSlow" mem0
+                         _             -> mem0
               mem2 = case Map.lookup "stormSlow" mem1 of
-                       Just (MInt v) -> if v > 0 then Map.insert "stormSlow" (MInt (v - 1)) mem1 else Map.delete "stormSlow" mem1
-                       _             -> mem1
+                         Just (MInt v) -> if v > 0 then Map.insert "stormSlow" (MInt (v - 1)) mem1 else Map.delete "stormSlow" mem1
+                         _             -> mem1
 
               (finalAmmo, finalReloadTimer)
                 | robotReloadTimer r == 1 && newReloadTimer == 0 = (getMagazineSize (robotType r), 0)
@@ -506,8 +509,8 @@ decreaseCooldown gs =
                Just pu ->
                  let newPUTimer = max 0 (puTimer pu - 1)
                  in if newPUTimer == 0
-                      then (Nothing, currentSpawnTimer) -- El Power-up expira del mapa
-                      else (Just (pu { puTimer = newPUTimer }), currentSpawnTimer)
+                       then (Nothing, currentSpawnTimer) -- El Power-up expira del mapa
+                       else (Just (pu { puTimer = newPUTimer }), currentSpawnTimer)
                Nothing -> (Nothing, max 0 (currentSpawnTimer - 1)) -- Solo reducir el temporizador de reaparición
 
         -- Función auxiliar para reducir el tiempo de vida de un proyectil
@@ -649,10 +652,35 @@ resolveCollisions collisions gs =
 -- Resuelve un único evento de colisión según su tipo
 resolveCollision :: CollisionEvent -> GameState -> GameState
 resolveCollision (ROBOT_PROJECTILE r p) gs =
-  gs { robots = map (applyDamageIfMatch r (projDamage p)) (robots gs)
+  -- **** INICIO MODIFICACIÓN ESTADÍSTICAS ****
+  let
+    shooterId = projOwner p
+    targetId  = objId (robotBase r)
+    
+    -- No contar auto-impactos
+    isSelfHit = shooterId == targetId
+
+    -- Comprobar si el objetivo tiene escudo ANTES de aplicar daño
+    targetHasShield = robotShieldTimer r > 0
+    
+    -- Solo contamos el impacto si NO es auto-impacto Y NO tiene escudo
+    isCountedImpact = (not isSelfHit) && (not targetHasShield)
+
+    updateBot :: Robot -> Robot
+    updateBot bot
+      -- 1. Si es el objetivo, aplicar daño
+      | objId (robotBase bot) == targetId = applyDamageIfMatch r (projDamage p) bot
+      -- 2. Si es el disparador Y el impacto cuenta, sumar 1
+      | objId (robotBase bot) == shooterId && isCountedImpact = bot { robotImpactosHechos = robotImpactosHechos bot + 1 }
+      -- 3. Otro bot
+      | otherwise = bot
+  in
+  gs { robots = map updateBot (robots gs)
      -- Eliminar el proyectil específico involucrado en la colisión
      , projectiles = filter (\proj -> objId (projBase proj) /= objId (projBase p) || projOwner proj /= projOwner p) (projectiles gs)
      }
+  -- **** FIN MODIFICACIÓN ESTADÍSTICAS ****
+
 resolveCollision (ROBOT_ROBOT r1 r2) gs
   -- Ignorar la colisión si alguno de los robots es inmune (por una colisión reciente)
   | robotCollisionTimer r1 > 0 || robotCollisionTimer r2 > 0 = gs
@@ -695,9 +723,9 @@ resolveCollision (ROBOT_ROBOT r1 r2) gs
           -- 2. Obtener los obstáculos WALL
           wallObstacles = filter isBlockingObstacle (E.obstacles gs)
           isBlockingObstacle o = case obsType o of
-                             WALL -> True
-                             TORRE_TESLA{} -> True
-                             _ -> False
+                                 WALL -> True
+                                 TORRE_TESLA{} -> True
+                                 _ -> False
 
           -- 3. Comprobar si las posiciones *tentativas* colisionan con algún WALL
           collidesWithWall1 = any (fromMaybe False . checkCollision verts1_pushed . obsVerts) wallObstacles
@@ -754,8 +782,8 @@ resolveCollision (ROBOT_OBSTACLE r o) gs =
       -- Cambiamos el estado de ESE obstáculo en la lista global
       let
         activarMina obs = if obsId obs == obsId o
-                          then obs { obsType = MINA_ACTIVA { contador = 120 } } -- 120 frames = 2 segundos
-                          else obs
+                           then obs { obsType = MINA_ACTIVA { contador = 120 } } -- 120 frames = 2 segundos
+                           else obs
       in
         gs { E.obstacles = map activarMina (E.obstacles gs) }
 
@@ -778,8 +806,8 @@ resolveCollision (ROBOT_OBSTACLE r o) gs =
       let rid = objId (robotBase robot)
           stormFrames = 30
           setSlow r' = if objId (robotBase r') == rid
-                       then r' { robotMem = Map.insert "stormSlow" (MInt stormFrames) (robotMem r') }
-                       else r'
+                         then r' { robotMem = Map.insert "stormSlow" (MInt stormFrames) (robotMem r') }
+                         else r'
       in gsState { robots = map setSlow (robots gsState) }
 
 resolveCollision (PROJECTILE_OBSTACLE p o) gs =
@@ -818,7 +846,7 @@ applyPowerUpIfMatch targetRobot pu r =
     case puType pu of
       Health     -> r { robotHealth = min (robotMaxHealth r) (robotHealth r + healthPackAmount) }
       AmmoBoost  -> let maxAllowed = 2 * getMagazineSize (robotType r) -- Limitar la munición máxima
-                     in r { robotAmmo = min maxAllowed (robotAmmo r + ammoBoostAmount) }
+                       in r { robotAmmo = min maxAllowed (robotAmmo r + ammoBoostAmount) }
       SpeedBoost -> r { robotSpeedBoostTimer = speedBoostDuration }
       Shield     -> r { robotShieldTimer = shieldDuration }
   else
@@ -835,9 +863,9 @@ applyObstacleDamageIfMatch targetRobot damage r =
       -- Aseguramos que el daño de obstáculo no sea letal instantáneo
       let frameDamage = damage / 5.0 -- Dividido para que no sea tan severo
       in r { robotHealth = max 0 (robotHealth r - frameDamage)
-         , robotHitTimer = damageFlashTimer -- Parpadeo
-         , robotObstacleCollisionTimer = obstacleCollisionCooldown -- Activa inmunidad a obstáculos
-         }
+           , robotHitTimer = damageFlashTimer -- Parpadeo
+           , robotObstacleCollisionTimer = obstacleCollisionCooldown -- Activa inmunidad a obstáculos
+           }
   else
     r
 
@@ -875,8 +903,8 @@ randomPowerUpPosition gs = generateUntilValid
       let isColliding = any (\obs -> fromMaybe False (checkCollision puVerts (obsVerts obs))) allObstacles
 
       if isColliding
-        then generateUntilValid -- Si colisiona, intenta generar otra posición
-        else return potentialPos -- Si no colisiona, esta posición es válida
+         then generateUntilValid -- Si colisiona, intenta generar otra posición
+         else return potentialPos -- Si no colisiona, esta posición es válida
 
 -- Crea un nuevo PowerUp en una localización y tipo aleatorios
 createNewPowerUp :: GameState -> IO PowerUp
@@ -935,7 +963,7 @@ updateTeslaTowers gs =
     -- Disminuir el temporizador de ralentizacion en memoria de cada robot (si existe)
     decSlow r = case Map.lookup "teslaSlow" (robotMem r) of
                   Just (MInt v) | v > 0 -> r { robotMem = Map.insert "teslaSlow" (MInt (v - 1)) (robotMem r) }
-                  Just (MInt _)          -> r { robotMem = Map.delete "teslaSlow" (robotMem r) }
+                  Just (MInt _)         -> r { robotMem = Map.delete "teslaSlow" (robotMem r) }
                   _ -> r
     robots0 = map decSlow (robots gs)
 
@@ -978,4 +1006,3 @@ updateTeslaTowers gs =
     teslaSlowFrames    = 30    -- 0.5s a 60fps
 
   in gs { robots = robotsFinal, E.obstacles = reverse obstaclesFinal }
-

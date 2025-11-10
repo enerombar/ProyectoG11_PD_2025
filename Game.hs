@@ -1,3 +1,6 @@
+-- Fichero: Game.hs
+-- (VERSIÓN MODIFICADA - Reemplazar)
+
 module Game where
 -- Este módulo maneja la creación de entidades y la inicialización del estado del juego.
 
@@ -76,6 +79,10 @@ createRobot rid rname rtype behavior pos ang _health radar
         , robotSpeedBoostTimer = 0
         , robotShieldTimer = 0
         , robotStuckTimer = 0
+        -- **** INICIO DE MODIFICACIÓN ESTADÍSTICAS ****
+        , robotImpactosHechos = 0   -- <<< AÑADIDO
+        , robotTiempoVivo = 0.0 -- <<< AÑADIDO
+        -- **** FIN DE MODIFICACIÓN ESTADÍSTICAS ****
         }
     where
       -- Crea el GameObject base con los parámetros
@@ -151,8 +158,8 @@ generateRandomPositions gameDims numToGen margin minSep existingToAvoid minSepFr
       let tooCloseToExisting = any (\p -> distance newPos p < minSepFromExisting) existingToAvoid
       
       if tooCloseToSelf || tooCloseToExisting
-        then generateOneValidPosition generatedSoFar -- Reintenta
-        else return newPos -- Posición válida
+         then generateOneValidPosition generatedSoFar -- Reintenta
+         else return newPos -- Posición válida
 
     -- Función auxiliar recursiva
     go :: Int -> [Position] -> IO [Position]
@@ -208,6 +215,9 @@ exampleGameState = do
     , powerUp = Nothing      -- Sin power-up activo al inicio
     , powerUpSpawnTimer = powerUpSpawnInterval -- Inicia el temporizador para el primer 'spawn'
     , gsShowHitboxes = False
+    -- **** INICIO DE MODIFICACIÓN ESTADÍSTICAS ****
+    , gsDeadRobots = [] -- <<< AÑADIDO
+    -- **** FIN DE MODIFICACIÓN ESTADÍSTICAS ****
     }
 
 -- Esta función crea el estado de juego inicial basado en la configuración del menú.
@@ -236,29 +246,29 @@ startGameFromConfigs width height enablePowerups showHitboxes cfgs = do
       r <- randomRIO (0::Float, 1); 
       -- Usamos los nuevos tipos de Entities.hs
       return (if r < 0.45 then WALL
-              else if r < 0.60 then DAMAGE_ZONE_RECT
-              else if r < 0.75 then DAMAGE_ZONE
-              else if r < 0.90 then STORM_ZONE
-              else if r < 0.97 then MINA_INACTIVA
-              else TORRE_TESLA { teslaRange = 220.0, teslaCooldown = 60, teslaTimer = 0 }) -- Torre Tesla
-    ) [1..numObstacles]
-    
+               else if r < 0.60 then DAMAGE_ZONE_RECT
+               else if r < 0.75 then DAMAGE_ZONE
+               else if r < 0.90 then STORM_ZONE
+               else if r < 0.97 then MINA_INACTIVA
+               else TORRE_TESLA { teslaRange = 220.0, teslaCooldown = 60, teslaTimer = 0 }) -- Torre Tesla
+     ) [1..numObstacles]
+     
   -- CAMBIO: Genera tamaños basados en el tipo para mantener el aspect ratio
   obstacleSizes <- mapM (\oType -> do
       -- Genera un ancho aleatorio basado en las constantes
       w <- randomRIO (minObstacleSize, maxObstacleSize)
       -- Calcula el alto basado en el aspect ratio del tipo
       let ratio = case oType of
-                    WALL            -> wallAspectRatio
-                    DAMAGE_ZONE_RECT-> damageZoneRectAspectRatio
-                    DAMAGE_ZONE     -> damageZoneCircularAspectRatio
-                    STORM_ZONE      -> damageZoneCircularAspectRatio
-                    MINA_INACTIVA   -> damageZoneCircularAspectRatio
-                    MINA_ACTIVA _   -> damageZoneCircularAspectRatio
-                    TORRE_TESLA{}   -> damageZoneCircularAspectRatio
+                     WALL            -> wallAspectRatio
+                     DAMAGE_ZONE_RECT-> damageZoneRectAspectRatio
+                     DAMAGE_ZONE     -> damageZoneCircularAspectRatio
+                     STORM_ZONE      -> damageZoneCircularAspectRatio
+                     MINA_INACTIVA   -> damageZoneCircularAspectRatio
+                     MINA_ACTIVA _   -> damageZoneCircularAspectRatio
+                     TORRE_TESLA{}   -> damageZoneCircularAspectRatio
       let h = w / ratio
       return (v2 w h)
-    ) obstacleTypes -- Pasa la lista de tipos generada
+     ) obstacleTypes -- Pasa la lista de tipos generada
 
   let obstacleIds = [nRobots + 1 .. nRobots + numObstacles]
 
@@ -280,6 +290,9 @@ startGameFromConfigs width height enablePowerups showHitboxes cfgs = do
       , powerUp = Nothing
       , powerUpSpawnTimer = powerUpSpawnInterval
       , gsShowHitboxes = showHitboxes
+      -- **** INICIO DE MODIFICACIÓN ESTADÍSTICAS ****
+      , gsDeadRobots = [] -- <<< AÑADIDO
+      -- **** FIN DE MODIFICACIÓN ESTADÍSTICAS ****
       }
 
 -- Función auxiliar para combinar cuatro listas (zip)

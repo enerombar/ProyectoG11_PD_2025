@@ -22,7 +22,8 @@ executable juego
     IA,
     Logic,
     Math,
-    Physics
+    Physics,
+    Estadisticas
   -- other-extensions:
   build-depends:
     base >=4.12 && <4.20,
@@ -31,5 +32,30 @@ executable juego
     gloss-juicy,
     random >=1.2 && <1.5
 
+  -- hs-source-dirs:
+  default-language:    Haskell2010
+
+executable torneos
+  -- El archivo principal para este ejecutable es torneos.hs
+  main-is:             torneos.hs
+  
+  -- Incluimos los mismos módulos que el 'juego' original
+  other-modules:
+    Entities,
+    Game,
+    IA,
+    Logic,
+    Math,
+    Physics,
+    Estadisticas
+  
+  -- Incluimos las mismas dependencias
+  build-depends:
+    base >=4.12 && <4.20,
+    gloss >=1.13.2.2,
+    containers >=0.6.5.1,
+    gloss-juicy,
+    random >=1.2 && <1.5
+  
   -- hs-source-dirs:
   default-language:    Haskell2010

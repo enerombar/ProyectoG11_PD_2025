@@ -1,0 +1,41 @@
+# Configuración de Torneos
+# Formato: Clave = Valor
+# Comentarios empiezan con #
+
+# ---------------------------------------------------
+# Participantes
+# ---------------------------------------------------
+# Lista de IAs separadas por comas.
+# Formato: TIPO COMPORTAMIENTO
+# Tipos: LIGHT, MEDIUM, HEAVY
+# Comportamientos: AGGRESSIVE, BALANCED, DEFENSIVE, PEACEFUL, RAMMER
+bots = HEAVY AGGRESSIVE, MEDIUM BALANCED, LIGHT DEFENSIVE, MEDIUM RAMMER
+
+# Opcional: añade un jugador. Descomenta la línea de abajo.
+# El tipo de chasis del jugador (LIGHT, MEDIUM, HEAVY)
+player_bot = LIGHT
+
+# ---------------------------------------------------
+# Configuración del Mundo
+# ---------------------------------------------------
+
+# Dimensiones del mapa
+width = 1280
+height = 720
+
+# Habilitar powerups (true/false)
+powerups = true
+
+# Mostrar hitboxes (true/false)
+show_hitboxes = false
+
+# ---------------------------------------------------
+# Configuración del Torneo
+# ---------------------------------------------------
+
+# Duración máxima de una partida (en segundos)
+# Si se alcanza este tiempo, la partida se reinicia (empate).
+duration = 120
+
+# Número de torneos a ejecutar consecutivamente
+num_tournaments = 3

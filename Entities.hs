@@ -1,3 +1,6 @@
+-- Fichero: Entities.hs
+-- (VERSIÓN MODIFICADA - Reemplazar)
+
 module Entities where
 -- Este módulo define todas las estructuras de datos y tipos principales del juego.
 
@@ -50,7 +53,7 @@ data TankConfig = TankConfig
   } deriving (Show, Eq)
 
 -- Tipos de robots (chasis).
-data RobotType = LIGHT | MEDIUM | HEAVY deriving (Show, Eq)
+data RobotType = LIGHT | MEDIUM | HEAVY deriving (Show, Eq, Read)
 
 -- Comportamientos de la IA.
 data IABehavior = AGGRESSIVE | BALANCED | DEFENSIVE | PEACEFUL | RAMMER | PLAYER
@@ -83,6 +86,12 @@ data Robot = Robot
   , robotSpeedBoostTimer :: Int -- Duración restante del power-up de velocidad recogido
   , robotShieldTimer :: Int    -- Duración restante del power-up de escudo recogido
   , robotStuckTimer :: Int    -- Temporizador para detectar atascos
+
+  -- **** CAMPOS NUEVOS PARA ESTADÍSTICAS ****
+  , robotImpactosHechos :: Int   -- Nº de veces que este robot ha impactado a otro
+  , robotTiempoVivo     :: Float -- Tiempo total (en segundos) que este robot ha estado vivo
+  -- **** FIN CAMPOS NUEVOS ****
+
   } deriving (Show, Eq)
 
 -- Representa una bala disparada.
@@ -118,6 +127,11 @@ data GameState = GameState
   , powerUp :: Maybe PowerUp -- El power-up actualmente activo en el mapa
   , powerUpSpawnTimer :: Int   -- Temporizador hasta que aparezca el próximo power-up
   , gsShowHitboxes :: Bool -- Si se deben dibujar las hitboxes
+
+  -- **** CAMPO NUEVO PARA ESTADÍSTICAS ****
+  , gsDeadRobots :: [Robot]  -- Para guardar los robots muertos en esta ronda
+  -- **** FIN CAMPO NUEVO ****
+
   } deriving (Show)
 
 
@@ -134,8 +148,8 @@ type AgentMemory = Map.Map String AgentMemoryValue
 
 -- Tipos de acciones que un robot puede decidir ejecutar.
 data ActionType
-  = STOP_ACTION             -- Detenerse
-  | MOVE_FORWARD_ACTION     -- Moverse hacia adelante
+  = STOP_ACTION           -- Detenerse
+  | MOVE_FORWARD_ACTION   -- Moverse hacia adelante
   | MOVE_BACKWARD_ACTION    -- Moverse hacia atrás
   | ROTATE_TURRET_ACTION Angle -- Rotar torreta a un ángulo absoluto
   | ROTATE_ROBOT_ACTION Angle  -- Rotar chasis a un ángulo absoluto
@@ -183,17 +197,17 @@ data PowerUp = PowerUp
 -- --- Obstáculos ---
 
 -- Tipos de Obstáculos
-data ObstacleType = WALL             -- Bloquea (Rectangular)
+data ObstacleType = WALL            -- Bloquea (Rectangular)
                   | DAMAGE_ZONE_RECT -- Daña (Rectangular)
                   | DAMAGE_ZONE      -- Daña (Circular)
                   -- MODIFICACIÓN PARA MINAS:
                   | MINA_INACTIVA    -- (Circular) Mina esperando ser pisada
                   | MINA_ACTIVA { contador :: Int } -- (Circular) Mina en cuenta atrás
                   | TORRE_TESLA
-                        { teslaRange    :: Float   -- radio del campo eléctrico
-                        , teslaCooldown :: Int     -- tiempo entre disparos (frames)
-                        , teslaTimer    :: Int     -- contador interno actual
-                        }
+                       { teslaRange    :: Float   -- radio del campo eléctrico
+                       , teslaCooldown :: Int     -- tiempo entre disparos (frames)
+                       , teslaTimer    :: Int     -- contador interno actual
+                       }
                   | STORM_ZONE       -- Zona de tormenta (ralentiza, circular)
                   deriving (Show, Eq)
 
