@@ -32,17 +32,17 @@ En esta arena, múltiples robots controlados por diferentes IA o por un jugador 
 * **Control del Jugador:** Un robot puede ser controlado por el jugador mediante teclado (WASD) y ratón (apuntar/disparar).
 * **IA Modular:** Incluye múltiples comportamientos (Agresivo, Equilibrado, Defensivo, Pacífico, Embestidor) y utiliza memoria para recordar la última posición enemiga vista e investigarla.
 * **Sistema de Físicas:**
-  	* Movimiento de robots y proyectiles con velocidad y rotación.
-  	* Colisiones con los bordes del mundo (rebote).
+    * Movimiento de robots y proyectiles con velocidad y rotación.
+    * Colisiones con los bordes del mundo (rebote).
 * **Detección Avanzada de Colisiones (SAT):**
-  	* **Robot-Proyectil:** Detección precisa para aplicar daño.
-  	* **Robot-Robot:** Detección mediante el **Teorema de Ejes Separadores (SAT)** para prevenir solapamiento, aplicar daño por colisión (basado en peso y tipo RAMMER) y aplicar físicas de empuje (push-back).
-  	* **Robot-PowerUp:** Detección por proximidad (radio).
-  	* **Robot-Explosión:** Detección por radio para aplicar daño en área.
+    * **Robot-Proyectil:** Detección precisa para aplicar daño.
+    * **Robot-Robot:** Detección mediante el **Teorema de Ejes Separadores (SAT)** para prevenir solapamiento, aplicar daño por colisión (basado en peso y tipo RAMMER) y aplicar físicas de empuje (push-back).
+    * **Robot-PowerUp:** Detección por proximidad (radio).
+    * **Robot-Explosión:** Detección por radio para aplicar daño en área.
 * **Sistema de Combate:**
-  	* Salud, daño, cadencia de tiro, capacidad del cargador y tiempo de recarga variables según el tipo de robot.
-  	* Sistema de *cooldowns* (disparo, daño por colisión), recarga de munición y efectos visuales (parpadeo por daño).
-  	* Explosiones visuales al destruir un robot o impactar un proyectil.
+    * Salud, daño, cadencia de tiro, capacidad del cargador y tiempo de recarga variables según el tipo de robot.
+    * Sistema de *cooldowns* (disparo, daño por colisión), recarga de munición y efectos visuales (parpadeo por daño).
+    * Explosiones visuales al destruir un robot o impactar un proyectil.
 * **Power-ups:** Objetos recolectables que otorgan ventajas temporales (salud, munición extra, velocidad, escudo).
 * **Fin de Partida:** Detecta cuándo queda un solo robot o ninguno y muestra una pantalla de "Game Over" con el ganador o indicando empate.
 
@@ -64,19 +64,19 @@ Existen tres clases de robots, cada una con estadísticas distintas (definidas e
 
 La IA (definida en `IA.hs`) controla a los robots no jugadores.
 
-1. 	**Prioridades:** La IA primero evalúa si ir a por un power-up (`shouldGoForPowerUp`) comparando su distancia con la del enemigo más cercano al objeto.
-2. 	**Detección:** Usa `radarLength` para buscar al enemigo vivo más cercano (`findClosestEnemy`).
-3. 	**Memoria e Investigación:** Si un enemigo detectado se pierde de vista, la IA guarda su última posición conocida (`last_seen_pos` en `robotMem`) y se dirige hacia ella (`investigateOrWander`). Si llega cerca sin encontrarlo, olvida la posición y vuelve a deambular.
-4. 	**Navegación:**
-  	* **Wander (Deambular):** Si no hay enemigo visible ni posición que investigar, deambula (`wanderActions`), usando memoria y un temporizador para giros periódicos.
-  	* **Evitar Paredes:** Inicia una maniobra de evasión (retroceder y girar) si se acerca a un borde (`isNearWall`) o si su camino está bloqueado (`isPathBlocked`).
-  	* **Desatasco:** Si el robot permanece quieto (velocidad "casi cero") por más de `stuckTimeThreshold` (1 segundo), activa una maniobra de desatasco forzado (moverse atrás/adelante y girar).
-5. 	**Comportamientos de Combate:**
-  	* **`AGGRESSIVE`**: Persigue activamente (`actionsToMoveTowards`), apunta y dispara (`actionsToAimAndFire`). Guarda la posición del enemigo si lo ve.
-  	* **`BALANCED`**: Se detiene, apunta y dispara. No persigue, pero sí investiga si pierde al enemigo.
-  	* **`DEFENSIVE`**: Apunta y dispara. Si el enemigo está muy cerca (50% del radar), retrocede mientras dispara. Investiga si pierde al enemigo.
-  	* **`PEACEFUL`**: Deambula o va a por power-ups. Ignora y nunca ataca a los enemigos. Borra la memoria de posiciones.
-  	* **`RAMMER`**: **Nunca dispara**. Prioriza perseguir enemigos de peso igual o inferior. Si no hay, persigue al más cercano. Guarda su posición para investigar.
+1.  **Prioridades:** La IA primero evalúa si ir a por un power-up (`shouldGoForPowerUp`) comparando su distancia con la del enemigo más cercano al objeto.
+2.  **Detección:** Usa `radarLength` para buscar al enemigo vivo más cercano (`findClosestEnemy`).
+3.  **Memoria e Investigación:** Si un enemigo detectado se pierde de vista, la IA guarda su última posición conocida (`last_seen_pos` en `robotMem`) y se dirige hacia ella (`investigateOrWander`). Si llega cerca sin encontrarlo, olvida la posición y vuelve a deambular.
+4.  **Navegación:**
+    * **Wander (Deambular):** Si no hay enemigo visible ni posición que investigar, deambula (`wanderActions`), usando memoria y un temporizador para giros periódicos.
+    * **Evitar Paredes:** Inicia una maniobra de evasión (retroceder y girar) si se acerca a un borde (`isNearWall`) o si su camino está bloqueado (`isPathBlocked`).
+    * **Desatasco:** Si el robot permanece quieto (velocidad "casi cero") por más de `stuckTimeThreshold` (1 segundo), activa una maniobra de desatasco forzado (moverse atrás/adelante y girar).
+5.  **Comportamientos de Combate:**
+    * **`AGGRESSIVE`**: Persigue activamente (`actionsToMoveTowards`), apunta y dispara (`actionsToAimAndFire`). Guarda la posición del enemigo si lo ve.
+    * **`BALANCED`**: Se detiene, apunta y dispara. No persigue, pero sí investiga si pierde al enemigo.
+    * **`DEFENSIVE`**: Apunta y dispara. Si el enemigo está muy cerca (50% del radar), retrocede mientras dispara. Investiga si pierde al enemigo.
+    * **`PEACEFUL`**: Deambula o va a por power-ups. Ignora y nunca ataca a los enemigos. Borra la memoria de posiciones.
+    * **`RAMMER`**: **Nunca dispara**. Prioriza perseguir enemigos de peso igual o inferior. Si no hay, persigue al más cercano. Guarda su posición para investigar.
 
 ### Control del Jugador
 
@@ -97,10 +97,10 @@ Si están habilitados en el menú, aparecen periódicamente en el mapa.
 * **Duración:** Permanece `powerUpDuration` (20 segundos) en el mapa antes de desaparecer y reiniciar el temporizador de aparición.
 * **Recogida:** Un robot lo recoge al pasar cerca (suma de radios).
 * **Tipos (`Entities.hs`):**
-  	* **`Health`**: Restaura `healthPackAmount` (35) de vida (hasta el máximo).
-  	* **`AmmoBoost`**: Añade `ammoBoostAmount` (5) balas al cargador (hasta 2x tamaño máx.).
-  	* **`SpeedBoost`**: Aumenta la velocidad máxima por `speedBoostFactor` (x2.0) durante `speedBoostDuration` (7s).
-  	* **`Shield`**: Otorga invulnerabilidad al daño durante `shieldDuration` (10s).
+    * **`Health`**: Restaura `healthPackAmount` (35) de vida (hasta el máximo).
+    * **`AmmoBoost`**: Añade `ammoBoostAmount` (5) balas al cargador (hasta 2x tamaño máx.).
+    * **`SpeedBoost`**: Aumenta la velocidad máxima por `speedBoostFactor` (x2.0) durante `speedBoostDuration` (7s).
+    * **`Shield`**: Otorga invulnerabilidad al daño durante `shieldDuration` (10s).
 
 ### Obstáculos
 
@@ -118,47 +118,42 @@ La generación de obstáculos (`startGameFromConfigs` en `Game.hs`) tiene las si
 Cada tipo de obstáculo tiene un comportamiento único:
 
 * **`WALL` (Pared)**
-  	* **Apariencia:** Un muro rectangular (`wall.png`).
-  	* **Interacción:** Es un objeto sólido.
-  	* **Bloquea el movimiento** de los robots. La física incluye lógica de "deslizamiento" para que los robots no se queden atascados al rozarlos (`Logic.hs`, `updatePosition`).
-  	* **Bloquea proyectiles**, destruyéndolos y creando una explosión al impacto (`Physics.hs`, `detectProjectileObstacleCollisions`).
+    * **Apariencia:** Un muro rectangular (`wall.png`).
+    * **Interacción:** Es un objeto sólido.
+    * **Bloquea el movimiento** de los robots. La física incluye lógica de "deslizamiento" para que los robots no se queden atascados al rozarlos (`Logic.hs`, `updatePosition`).
+    * **Bloquea proyectiles**, destruyéndolos y creando una explosión al impacto (`Physics.hs`, `detectProjectileObstacleCollisions`).
 
 * **`DAMAGE_ZONE_RECT` (Zona de Daño Rectangular)**
-  	* **Apariencia:** Una zona de peligro rectangular (`damage_zone_rect.png`).
-  	* **Interacción:** **No bloquea el movimiento** de robots.
-  	* Los robots que entran en contacto con ella reciben daño (`Logic.hs`, `resolveCollision`).
-  	* **Bloquea proyectiles**, destruyéndolos al impacto.
+    * **Apariencia:** Una zona de peligro rectangular (`damage_zone_rect.png`).
+    * **Interacción:** **No bloquea el movimiento** de robots.
+    * Los robots que entran en contacto con ella reciben daño (`Logic.hs`, `resolveCollision`).
+    * **Bloquea proyectiles**, destruyéndolos al impacto.
 
 * **`DAMAGE_ZONE` (Zona de Daño Circular)**
-  	* **Apariencia:** Una zona de peligro circular (`damage_zone.png`).
-  	* **Interacción:** **No bloquea el movimiento** de robots.
-  	* Causa el mismo daño que la zona rectangular.
-  	* **No bloquea proyectiles**; la atraviesan sin efecto.
+    * **Apariencia:** Una zona de peligro circular (`damage_zone.png`).
+    * **Interacción:** **No bloquea el movimiento** de robots.
+    * Causa el mismo daño que la zona rectangular.
+    * **No bloquea proyectiles**; la atraviesan sin efecto.
 
 * **`STORM_ZONE` (Zona de Tormenta)**
-  	* **Apariencia:** Una nube circular y semitransparente (`tormenta.png`).
-  	* **Interacción:** **No bloquea el movimiento** de robots.
-  	* Los robots que entran en contacto reciben un *debuff* de ralentización (`"stormSlow"`) que dura 30 frames y reduce su velocidad máxima en un 35% (`Logic.hs`, `applyStormSlow` y `updateVelocity`).
+    * **Apariencia:** Una nube circular y semitransparente (`tormenta.png`).
+    * **Interacción:** **No bloquea el movimiento** de robots.
+    * Los robots que entran en contacto reciben un *debuff* de ralentización (`"stormSlow"`) que dura 30 frames y reduce su velocidad máxima en un 35% (`Logic.hs`, `applyStormSlow` y `updateVelocity`).
 
 * **`MINA_INACTIVA` / `MINA_ACTIVA` (Mina)**
-  	* **Apariencia:** Circular. Comienza como `mina_inactiva.png`. Al ser pisada, cambia a `mina_activa.png` y parpadea (`Main.hs`).
-  	* **Interacción:**
-  	 	1. 	**Inactiva:** No hace nada. Si un robot la toca, se activa.
-  	 	2. 	**Activa:** El obstáculo cambia su tipo a `MINA_ACTIVA` e inicia una cuenta atrás de 120 frames (2 segundos) (`Logic.hs`, `resolveCollision`).
-section {
-  	 	3. 	**Explosión:** Cuando el contador llega a 0 (`resolveExplodingMines`), la mina se elimina y genera una explosión (`crearExplosionDeMina`) en su lugar, con un radio 1.5 veces mayor que la propia mina.
+    * **Apariencia:** Circular. Comienza como `mina_inactiva.png`. Al ser pisada, cambia a `mina_activa.png` y parpadea (`Main.hs`).
+    * **Interacción:**
+        1.  **Inactiva:** No hace nada. Si un robot la toca, se activa.
+        2.  **Activa:** El obstáculo cambia su tipo a `MINA_ACTIVA` e inicia una cuenta atrás de 120 frames (2 segundos) (`Logic.hs`, `resolveCollision`).
+        3.  **Explosión:** Cuando el contador llega a 0 (`resolveExplodingMines`), la mina se elimina y genera una explosión (`crearExplosionDeMina`) en su lugar, con un radio 1.5 veces mayor que la propia mina.
 
 * **`TORRE_TESLA` (Torre Tesla)**
-  	* **Apariencia:** Una torre circular estática (`torre_tesla.png`).
-  	* **Interacción:** Tiene un comportamiento doble:
-  	 	1. 	**Sólida:** Al igual que un `WALL`, **bloquea el movimiento** de robots 	y **destruye proyectiles** al impacto (`Physics.hs`).
-_TESLA` (Torre Tesla)**
-  	* **Apariencia:** Una torre circular estática (`torre_tesla.png`).
-  	* **Interacción:** Tiene un comportamiento doble:
-  	 	1. 	**Sólida:** Al igual que un `WALL`, **bloquea el movimiento** de robots 	y **destruye proyectiles** al impacto (`Physics.hs`).
-  	 	2. 	**Ataque:** Cada 60 frames (`teslaCooldown`), escanea en un radio de 220.0 (`teslaRange`). Si detecta robots, ataca al más cercano (`Logic.hs`, `updateTeslaTowers`).
-  	 	3. 	**Efecto:** El ataque inflige 4.0 de daño (`teslaDamagePerShot`) y aplica un *debuff* de ralentización (`"teslaSlow"`) que dura 30 frames y reduce la velocidad máxima en un 15% (`Logic.hs`, `updateVelocity`, `updateTeslaTowers`).
-  	* **Visualización:** Cuando ataca, `Main.hs` dibuja un rayo azul (`drawTeslaBeams`) desde la torre hasta el objetivo. Si la opción "Mostrar Hitboxes" está activa, se dibuja su radio de ataque.
+    * **Apariencia:** Una torre circular estática (`torre_tesla.png`).
+    * **Interacción:** Tiene un comportamiento doble:
+        1.  **Sólida:** Al igual que un `WALL`, **bloquea el movimiento** de robots     y **destruye proyectiles** al impacto (`Physics.hs`).
+        2.  **Ataque:** Cada 60 frames (`teslaCooldown`), escanea en un radio de 220.0 (`teslaRange`). Si detecta robots, ataca al más cercano (`Logic.hs`, `updateTeslaTowers`).
+        3.  **Efecto:** El ataque inflige 4.0 de daño (`teslaDamagePerShot`) y aplica un *debuff* de ralentización (`"teslaSlow"`) que dura 30 frames y reduce la velocidad máxima en un 15% (`Logic.hs`, `updateVelocity`, `updateTeslaTowers`).
+    * **Visualización:** Cuando ataca, `Main.hs` dibuja un rayo azul (`drawTeslaBeams`) desde la torre hasta el objetivo. Si la opción "Mostrar Hitboxes" está activa, se dibuja su radio de ataque.
 
 #### Interacción General con Obstáculos
 
@@ -174,41 +169,38 @@ Gestionadas principalmente en `Physics.hs` (detección) y `Logic.hs` (resolució
 * **Movimiento:** Actualización simple de posición: `posición + velocidad * dt`. La velocidad se aplica según las acciones (`applyAction`). Se aplica fricción (`speedDec`) si la acción es `STOP_ACTION`.
 * **Colisiones con Muros/Bordes:** Se detectan usando SAT contra los bordes del mapa y obstáculos tipo `WALL` o `TORRE_TESLA` (`updatePosition`). El robot intenta "deslizarse" (`updatePosition`). Si queda atascado en una esquina, se detiene.
 * **Colisiones Robot-Robot:**
-  	1. 	**Detección:** Usando SAT (`checkCollision` en `Physics.hs`).
-  	2. 	**Resolución (`resolveCollision` en `Logic.hs`):**
-  	 	* **Daño:** Ambos robots reciben daño si no están en cooldown (`robotCollisionTimer`). El daño base (`baseRobotCollisionDamage`) se escala por la proporción de peso del *otro* robot. Los `RAMMER` multiplican el daño que *infligen*.
-section {
-  	 	* **Empuje (Push-back):** Los robots se separan físicamente una distancia proporcional al solapamiento detectado y al peso del oponente. La posición final se asegura (`clampRobotPosition`) para no salirse del mapa.
-  	 	* **Inmunidad:** Se activa un breve cooldown (`robotCollisionCooldown`) para evitar daño múltiple instantáneo.
-  	3. 	**Bloqueo (Prevención):** Los robots (excepto `RAMMER`) se detienen si colisionan con otro robot (`updatePosition`).
+    1.  **Detección:** Usando SAT (`checkCollision` en `Physics.hs`).
+    2.  **Resolución (`resolveCollision` en `Logic.hs`):**
+        * **Daño:** Ambos robots reciben daño si no están en cooldown (`robotCollisionTimer`). El daño base (`baseRobotCollisionDamage`) se escala por la proporción de peso del *otro* robot. Los `RAMMER` multiplican el daño que *infligen*.
+        * **Empuje (Push-back):** Los robots se separan físicamente una distancia proporcional al solapamiento detectado y al peso del oponente. La posición final se asegura (`clampRobotPosition`) para no salirse del mapa.
+        * **Inmunidad:** Se activa un breve cooldown (`robotCollisionCooldown`) para evitar daño múltiple instantáneo.
+  Zasl* **Bloqueo (Prevención):** Los robots (excepto `RAMMER`) se detienen si colisionan con otro robot (`updatePosition`).
 * **Colisiones Robot-Proyectil:**
-section {
-  	* Detección SAT (`Physics.hs`).
-  	* Resolución (`resolveCollision`): Se aplica `projDamage`. Si el robot tiene escudo (`robotShieldTimer > 0`), el daño se anula. El proyectil se elimina. Se activa el parpadeo (`robotHitTimer`).
+    * Detección SAT (`Physics.hs`).
+    * Resolución (`resolveCollision`): Se aplica `projDamage`. Si el robot tiene escudo (`robotShieldTimer > 0`), el daño se anula. El proyectil se elimina. Se activa el parpadeo (`robotHitTimer`).
 * **Colisiones Robot-Explosión:**
-  	* Detección por radio (`Physics.hs`).
-  	* Resolución (`resolveCollision`): Se aplica `explosionDamageConstant`. Ignorado si el escudo está activo.
+    * Detección por radio (`Physics.hs`).
+    * Resolución (`resolveCollision`): Se aplica `explosionDamageConstant`. Ignorado si el escudo está activo.
 * **Colisiones Robot-PowerUp:**
-  	* Detección por radio (`Physics.hs`).
-  	* Resolución (`resolveCollision`): Se aplica el efecto del power-up (`applyPowerUpIfMatch`) y el power-up se elimina del mapa.
+    * Detección por radio (`Physics.hs`).
+    * Resolución (`resolveCollision`): Se aplica el efecto del power-up (`applyPowerUpIfMatch`) y el power-up se elimina del mapa.
 * **Colisiones Robot-Obstáculo:**
-section {
-  	* Detección SAT (para `WALL`, `DAMAGE_ZONE_RECT`, `TORRE_TESLA`) o por radio (para `DAMAGE_ZONE`, `STORM_ZONE`, `MINA`).
-  	* Resolución (`resolveCollision`): Depende del tipo de obstáculo (ver sección Obstáculos).
+    * Detección SAT (para `WALL`, `DAMAGE_ZONE_RECT`, `TORRE_TESLA`) o por radio (para `DAMAGE_ZONE`, `STORM_ZONE`, `MINA`).
+    * Resolución (`resolveCollision`): Depende del tipo de obstáculo (ver sección Obstáculos).
 
 ### Bucle Principal del Juego
 
 Controlado por `updateHandler` -> `updateGame` en `Main.hs`:
 
-1. 	**`decreaseCooldown`**: Reduce todos los contadores (disparo, parpadeo, IA wander, colisión, recarga, power-ups activos, power-up en mapa, contadores de minas). Finaliza recargas y elimina explosiones. Actualiza proyectiles y los elimina si `projLifetime` llega a 0.
-2. 	**`resolveExplodingMines`**: Comprueba si alguna mina activa ha llegado a 0 en su contador, las elimina y crea explosiones en su lugar.
-3. 	**`updatePowerUpSpawning`**: Comprueba si debe aparecer un nuevo power-up.
-4. 	**`applyPlayerActionsFromState`**: Aplica las acciones derivadas de la entrada del jugador almacenada en `GameState`.
-5. 	**`getAIActions`**: Obtiene la lista de acciones decididas por la IA para todos los bots.
-6. 	**`applyActions`**: Ejecuta todas las acciones (jugador y IA), modificando velocidades, ángulos, memoria de IA, iniciando disparos, etc.
-7. 	**`updateTeslaTowers`**: Procesa la lógica de las torres Tesla (apuntar, disparar, aplicar efectos).
-8. 	**`updatePhysics`**: Mueve robots y proyectiles. Gestiona colisiones con bordes (rebote) y obstáculos sólidos (deslizamiento). Crea explosiones si los proyectiles chocan con bordes o expiran por tiempo.
-9. 	**`checkCollisions`**: Detecta *todas* las colisiones ocurridas *después* del movimiento (Robot-Proy, Robot-Robot, Robot-Explosión, Robot-PowerUp, Robot-Obstáculo, Proy-Obstáculo).
+1.  **`decreaseCooldown`**: Reduce todos los contadores (disparo, parpadeo, IA wander, colisión, recarga, power-ups activos, power-up en mapa, contadores de minas). Finaliza recargas y elimina explosiones. Actualiza proyectiles y los elimina si `projLifetime` llega a 0.
+2.  **`resolveExplodingMines`**: Comprueba si alguna mina activa ha llegado a 0 en su contador, las elimina y crea explosiones en su lugar.
+3.  **`updatePowerUpSpawning`**: Comprueba si debe aparecer un nuevo power-up.
+4.  **`applyPlayerActionsFromState`**: Aplica las acciones derivadas de la entrada del jugador almacenada en `GameState`.
+5.  **`getAIActions`**: Obtiene la lista de acciones decididas por la IA para todos los bots.
+6.  **`applyActions`**: Ejecuta todas las acciones (jugador y IA), modificando velocidades, ángulos, memoria de IA, iniciando disparos, etc.
+7.  **`updateTeslaTowers`**: Procesa la lógica de las torres Tesla (apuntar, disparar, aplicar efectos).
+8.  **`updatePhysics`**: Mueve robots y proyectiles. Gestiona colisiones con bordes (rebote) y obstáculos sólidos (deslizamiento). Crea explosiones si los proyectiles chocan con bordes o expiran por tiempo.
+9.  **`checkCollisions`**: Detecta *todas* las colisiones ocurridas *después* del movimiento (Robot-Proy, Robot-Robot, Robot-Explosión, Robot-PowerUp, Robot-Obstáculo, Proy-Obstáculo).
 10. **`resolveCollisions`**: Procesa las colisiones: aplica daño (considerando escudos), aplica empuje físico (robot-robot), elimina proyectiles/power-ups, activa minas, aplica efectos de obstáculos.
 11. **Gestión de Muerte:** Filtra robots vivos y muertos.
 12. **`createExplosionFromRobot`**: Crea explosiones visuales y de daño donde murieron los robots.
@@ -243,24 +235,24 @@ Controlado por `updateHandler` -> `updateGame` en `Main.hs`:
 ### Pasos para la Ejecución
 
 1. 	**Clona el repositorio (o descomprime el proyecto):**
-  	```bash
-  	git clone [URL_DEL_REPOSITORIO]
-  	cd [NOMBRE_CARPETA_PROYECCTO]
-  	```
+    ```bash
+    git clone [URL_DEL_REPOSITORIO]
+    cd [NOMBRE_CARPETA_PROYECTO]
+    ```
 
 2. 	**Verifica la carpeta `assets`:**
-  	Confirma que la carpeta `assets` existe en la raíz y contiene `mapa.jpg`, `screenshot.png` (opcional, para el README), y las subcarpetas `drones`, `torretas`, `items`, `obstaculos`, `explosion` con sus respectivas imágenes `.png`.
+    Confirma que la carpeta `assets` existe en la raíz y contiene `mapa.jpg`, `screenshot.png` (opcional, para el README), y las subcarpetas `drones`, `torretas`, `items`, `obstaculos`, `explosion` con sus respectivas imágenes `.png`.
 
 3. 	**Construye el proyecto:**
-  	Cabal gestionará las dependencias listadas en `juego.cabal` (`gloss`, `gloss-juicy`, `containers`, `random`) y compilará ambos ejecutables.
+    Cabal gestionará las dependencias listadas en `juego.cabal` (`gloss`, `gloss-juicy`, `containers`, `random`) y compilará ambos ejecutables.
 
-  	```bash
-  	# (Opcional) Actualiza la lista de paquetes disponibles
-  	cabal update
+    ```bash
+    # (Opcional) Actualiza la lista de paquetes disponibles
+    cabal update
 
-  	# Construye el proyecto (descarga dependencias si es necesario)
-  	cabal build
-  	```
+  S* Construye el proyecto (descarga dependencias si es necesario)
+    cabal build
+    ```
 
 4. 	**Elige un modo de ejecución:**
 
